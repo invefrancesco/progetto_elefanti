@@ -245,14 +245,14 @@ optim(
 ```
 
     ## $par
-    ## [1] -0.00231258 10.47589807
+    ## [1]  0.003507362 10.046045458
     ## 
     ## $value
-    ## [1] 27.01991
+    ## [1] 29.24898
     ## 
     ## $counts
     ## function gradient 
-    ##       79       NA 
+    ##       73       NA 
     ## 
     ## $convergence
     ## [1] 0
@@ -268,9 +268,9 @@ circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circu
     ## Call:
     ## circular::mle.vonmises(x = data_rndm, mu = NULL, kappa = NULL,     bias = FALSE, control.circular = list())
     ## 
-    ## mu: -0.002302  ( 0.03168 )
+    ## mu: 0.003558  ( 0.0324 )
     ## 
-    ## kappa: 10.48  ( 1.441 )
+    ## kappa: 10.04  ( 1.38 )
 
 ### Stima di una Von Mises con una covariata
 
@@ -344,14 +344,14 @@ optim(
 ```
 
     ## $par
-    ## [1] -0.9836589  3.3993029  2.2242170
+    ## [1] -0.9755738  3.7543957  2.4134297
     ## 
     ## $value
-    ## [1] 33.66021
+    ## [1] 23.63436
     ## 
     ## $counts
     ## function gradient 
-    ##      278       NA 
+    ##      242       NA 
     ## 
     ## $convergence
     ## [1] 0
@@ -368,14 +368,14 @@ optim(
 ```
 
     ## $par
-    ## [1] -0.9837296  3.3994193  2.2240243
+    ## [1] -0.975573  3.754716  2.413469
     ## 
     ## $value
-    ## [1] -150.1275
+    ## [1] -160.1534
     ## 
     ## $counts
     ## function gradient 
-    ##      290       NA 
+    ##      254       NA 
     ## 
     ## $convergence
     ## [1] 0
@@ -466,19 +466,37 @@ simulation <- function(n, K, beta.0, beta.1, kappa){
 simulation(10, 10, -1, 3.5, 10)
 ```
 
-    ##                 beta.0           beta.1   log.kappa
-    ## set_1       -1.1852832        3.0857809   1.2621773
-    ## set_2       -0.8103453        3.0285577   0.4032507
-    ## set_3       -0.6235536        2.6739506   1.1186022
-    ## set_4       -0.8858144        2.8537669   1.0782678
-    ## set_5  3805167.3716852 -1867393.5271958  -0.6851504
-    ## set_6        0.3506787       -0.2459558   0.2404983
-    ## set_7       39.8555556      -53.4888889 -88.3333333
-    ## set_8       17.7384415       15.6720492  -0.1191576
-    ## set_9        6.5255039        4.2105395  -0.0981695
-    ## set_10      -0.1309491       -0.3326076   0.2606413
+    ##             beta.0      beta.1  log.kappa
+    ## set_1  -1.67417315   8.9665979  0.6544009
+    ## set_2  -0.39030182  -2.7478355  0.7187374
+    ## set_3   0.02860978  -0.3907682  0.2795454
+    ## set_4   1.36402250   0.5440058  0.9120991
+    ## set_5  13.38691023  -6.9152050 -0.4487434
+    ## set_6  -1.19331085   3.9248413  0.5038434
+    ## set_7   4.77141791  -2.7794705  0.1196345
+    ## set_8   8.30356182 -11.6971430  0.3087571
+    ## set_9   0.67833252  -2.5647629  0.1372899
+    ## set_10 -0.70464874  -1.2594132 -0.1233619
 
 ## TODO
+
+- Calcolare la std degli stimatori di massima verosimiglianza per i
+  parametri
+
+  - Lo stimatore è distribuito asintoticamente come una normale con
+    media pari al valore vero del parametro e varianza pari all’inversa
+    dell’informazione attesa di Fisher
+
+  - La matrice Hessiana inversa della funzione di log-verosimiglianza è
+    una matrice di varianze e covarianze
+
+  - Le radici quadrate dei valori sulla diagonale sono uguali alle
+    deviazioni standard degli stimatori
+
+  - ci aspettiamo che le deviazioni standard trovate tramite la Hessiana
+    siano pari alle deviazioni standard dei valori stimati nella
+    simulazione e che la media della simulazione sia uguale al valore
+    vero del parametro
 
 - Calcolare RMSE e intervalli di confidenza e loro copertura nominale
 

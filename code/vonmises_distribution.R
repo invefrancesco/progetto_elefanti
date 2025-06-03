@@ -281,6 +281,17 @@ simulation <- function(n, K, beta.0, beta.1, kappa){
 simulation(10, 10, -1, 3.5, 10)
 
 #' ## TODO
+#' 
+#' - Calcolare la std degli stimatori di massima verosimiglianza per i parametri
+#'  
+#'    - Lo stimatore è distribuito asintoticamente come una normale con media pari al valore vero del parametro e varianza pari all'inversa dell'informazione attesa di Fisher
+#'    
+#'    - La matrice Hessiana inversa della funzione di log-verosimiglianza è una matrice di varianze e covarianze 
+#'    
+#'    - Le radici quadrate dei valori sulla diagonale sono uguali alle deviazioni standard degli stimatori 
+#'    
+#'    - ci aspettiamo che le deviazioni standard trovate tramite la Hessiana siano pari alle deviazioni standard dei valori stimati nella simulazione e che la media della simulazione sia uguale al valore vero del parametro
+#' 
 #' - Calcolare RMSE e intervalli di confidenza e loro copertura nominale
 #' 
 #' - Valutare come cambiano i risultati al variare della sample size
