@@ -2,14 +2,16 @@
 #' title: "Analisi del primo elefante (id: GON09)"
 #' author: "Francesco Invernizzi"
 #' date: "`r format(Sys.Date())`"
-#' output: html_document
+#' output:
+#'  html_document:
+#'    code_folding: hide
 #' ---
 #+ include = F
 rm(list = ls())
 file.remove(".Rhistory")
 setwd(dirname(dirname(rstudioapi::getSourceEditorContext()$path)))
 source("code/00_master_code.R")
-knitr::opts_chunk$set(fig.align = "center", echo = F, warning = F, message = F)
+knitr::opts_chunk$set(fig.align = "center", echo = T, warning = F, message = F)
 #' Usando il pacchetto `amt` e seguendo i passaggi svolti nel [paper di riferimento del pacchetto](https://doi.org/10.1002/ece3.4823) svolgo le analisi sul primo elefante del `df`. 
 #' 
 #' ### Preparazione dei dati
@@ -97,6 +99,3 @@ leaflet(data = GON09) %>%
 #' In questo caso fitto un modello in cui la variabile dipendente è la step length e sono incluse tutte le covariate ambientali a disposizione.
 mod1 <- lm(log(sl_) ~ distriv + ndvi + elev + seas, data = GON09_fnl)
 summary(mod1)
-
-  
-
