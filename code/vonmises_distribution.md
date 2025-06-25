@@ -194,14 +194,14 @@ optim(
 ```
 
     ## $par
-    ## [1] -0.02408383  8.68266089
+    ## [1] -0.001591691 13.262618582
     ## 
     ## $value
-    ## [1] 37.00964
+    ## [1] 14.65037
     ## 
     ## $counts
     ## function gradient 
-    ##       85       NA 
+    ##      101       NA 
     ## 
     ## $convergence
     ## [1] 0
@@ -217,9 +217,9 @@ circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circu
     ## Call:
     ## circular::mle.vonmises(x = data_rndm, mu = NULL, kappa = NULL,     bias = FALSE, control.circular = list())
     ## 
-    ## mu: -0.02397  ( 0.035 )
+    ## mu: -0.001635  ( 0.028 )
     ## 
-    ## kappa: 8.679  ( 1.186 )
+    ## kappa: 13.26  ( 1.837 )
 
 ### Stima di una Von Mises con una covariata
 
@@ -417,9 +417,3 @@ map(.x = sim_1,
     ## 
     ## $convergence
     ## [1] 0
-
-## TODO
-
-- Calcolare RMSE e intervalli di confidenza e loro copertura nominale
-
-- Valutare come cambiano i risultati al variare della sample size
