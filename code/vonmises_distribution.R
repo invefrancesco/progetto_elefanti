@@ -90,28 +90,6 @@ options(warn = -1)
 #'  Function `fn` can return `NA` or `Inf` if the function cannot be evaluated at the supplied value, but the initial value must have a computable finite value of fn. (Except for method "L-BFGS-B" where the values should always be finite.)
 #'  
 #'  `optim` can be used recursively, and for a single parameter as well as many. It also accepts a zero-length par, and just evaluates the function with that argument.
-#'  
-#' ### Esempio Normale 
-lik <- function(par, y, x) {# -log-likelihood function 
-  y = y 
-  x = x
-  beta0 <- par[1] 
-  beta1 <- par[2]
-  
-  lik <- sum(dnorm(y, mean = (beta0 + beta1*x), sd = sd(y), log = T))
-  return(-lik)
-}
-
-data("iris")
-
-lm(iris$Petal.Length ~ iris$Petal.Width)
-
-optim(
-  par = c(0,0),
-  fn = lik,
-  y = iris$Petal.Length,
-  x = iris$Petal.Width
-)
 
 #' ### Stima dei parametri della Von Mises  
 #'  Siano $X_1, \dots, X_n$ `n` v.a. iid, con $X_i \sim$ VonMises($\mu, k$)
@@ -128,7 +106,7 @@ log_lik_vm <- function(data, par){
 data_rndm <- circular::rvonmises(n = 100, mu = 0, kappa = 10)
 circular::plot.circular(data_rndm)
 
-#'    3. Massimizzo la funzione di log-verosimiglianza (e controllo i risultati con mle.vonmises)
+#'    3. Minimizzo la funzione di -log-verosimiglianza (e controllo i risultati con mle.vonmises)
 #+ warning = F
 optim(
   par = c(0,0),
@@ -140,11 +118,13 @@ circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circu
 
 #' ### Stima di una Von Mises con una covariata
 #' 
-#'  1. Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui 
+#' 1.   Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui 
 #'
 #'    - $X_i \sim N(0, 1)$
 #' 
 #'    - $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = (10))$
+
+set.seed(143)
 rndm_x <- rnorm(100)
 rndm_y <- array()
 
@@ -152,31 +132,8 @@ for(i in seq_along(rndm_x)) {
   rndm_y[i] = circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * rndm_x[i]), kappa = 10)
 }
 #'  
-#'  2. Definisco la funzione di log-verosimiglianza
-#'    
-#'      - la prima funzione denominata `log.lik.vm` sfrutta il pacchetto circular per definire la funzione 
-#'      
-#'      - nella seconda versione invece denominata `log.lik.vm.manual` la funzione è definita esplicitamente
-#'      
-#'      - le due versioni dovrebbero portare alla stessa stima di parametri
-log.lik.vm <- function(x, y, par){
-  
-  beta.0 <- par[1]
-  beta.1 <- par[2]
-  kappa.log <- exp(par[3])
-  
-  l <- array(dim=length(x))
-  
-  for (i in seq_along(x)) {
-    l[i] = circular::dvonmises(y[i], mu = 2 * atan(beta.0 + beta.1 * x[i]), kappa = kappa.log, log = T)
-  }
-  
-  log.lik <- sum(l)
-  
-  return(-log.lik)
-}
-
-log.lik.vm.manual <- function(par, x, y){
+#' 2.   Definisco la funzione di log-verosimiglianza
+log.lik.vm <- function(par, x, y){
   beta.0 <- par[1]
   beta.1 <- par[2]
   kappa.log <- exp(par[3])
@@ -190,19 +147,25 @@ log.lik.vm.manual <- function(par, x, y){
   log.lik <- sum(l)
   return(-log.lik)
 }
-#'    3. minimizzo la - log-verosimiglianza 
-optim(
-  par = c(log(1), 0, 0),
+#'    
+#' 3.   Minimizzo la funione 
+#'      -   `hessian = T` include nei risultati la matrice Hessiana, cioè la matrice di informazione osservata
+#'      -   Se questa matrice è invertibile, corrisponde asintoticamente alla matrice di varianza e covarianza dei parametri 
+#'      -   La radice quadrata dei valori sulla diagonale principale, corrispondo agli standard error asintotici dei parametri 
+
+result <- optim(
+  par = c(beta.0 = 0, beta.1 = 0, kappa = log(1)),
   fn = log.lik.vm,
   x = rndm_x,
-  y = rndm_y)
+  y = rndm_y, 
+  hessian = T)
 
-optim(
-  par = c(log(1), 0, 0),
-  fn = log.lik.vm.manual,
-  x = rndm_x,
-  y = rndm_y)
-#'
+det(result$hessian) != 0 # condizione di invertibilità
+cov.matrix <- solve(result$hessian)
+
+se <- sqrt(diag(cov.matrix))
+se
+
 #' ### Simulazione di $K$ repliche per lo stesso set di parametri veri
 #' 
 #' Definisco una funzione che dati 
@@ -216,81 +179,72 @@ optim(
 #'  * `kappa` = il valore reale del parametro di concentrazione della Von Mises 
 #'  
 #'  Genera $K$ set di random $x$ e random $y$ e stima i parametri ottimizzando la funzione di verosimiglianza per ogni set. La funzione restituisce una tabella in cui le colonne rappresentano i valori stimati dei parametri e le righe sono le $K$ simulazioni
-
-simulation <- function(n, K, beta.0, beta.1, kappa){
-  #  1. Genero un dataframe di valori casuali
+#'  
+vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
   
-  # Matrix of K column and n random normal values per column
-  x.matrix <- matrix(nrow = n, ncol = K)
-  for (k in 1:K) {
-    x.matrix[,k] <- rnorm(n)
-  }
-  
-  # Matrix of K column and n random values extracted from Von Mises distribution with mu = (beta.0 + beta.1 * x.matrix[r,k]) and kappa = kappa
-  y.matrix <- matrix(nrow = n, ncol = K)
-  for (k in 1:K) {
-    for (r in 1:n) {
-      y.matrix[r,k] <- circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * x.matrix[r,k]), kappa = kappa)
+  # funzione per generare i set di dati 
+  gen.data <- function(n){
+    x <- rnorm(n)
+    y <- c()
+    for (i in 1:n) {
+      y[i] <- circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * x[i]), kappa = kappa)
     }
+    
+    data <- tibble(x=x, y=y)
   }
   
-  # a tibble with x1, x2, ..., xn and y1, y2, ..., yn columns
-  xy.tibble <- tibble(
-    !!!set_names(as.data.frame(x.matrix), paste0("x", 1:K)),
-    !!!set_names(as.data.frame(y.matrix), paste0("y", 1:K))
-  )
-  
-  # 2. funzione di log-verosimiglianza da massimizzare
+  # definizione della funzione `log.lik`
   log.lik.vm <- function(par, x, y){
     
     beta.0 <- par[1]
     beta.1 <- par[2]
-    kappa.log <- exp(par[3])
+    kappa <- exp(par[3])
     
     l <- array(dim = length(x))
     
     for(i in seq_along(x)){
-      l[i] = kappa.log * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa.log, nu = 0)))
+      l[i] = kappa * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa, nu = 0)))
     }
     
     log.lik <- sum(l)
     return(-log.lik)
   }
   
-  # 3. ottimizzazione della funzione 
-  # matrice per registrare i risultati
-  results <- matrix(nrow = K, ncol = 3)
+  # stima dei parametri 
+  results <- map_dfr(
+    .x = map(1:K, ~ gen.data(n)),
+    .f = ~ {
+      mle <- optim(
+        par = c(beta.0 = 0, beta.1 = 0, log.kappa = log(1)),
+        fn = log.lik.vm,
+        x = .x$x,
+        y = .x$y
+      )
+      
+      tibble(
+        beta.0 = mle$par[1],
+        beta.1 = mle$par[2],
+        kappa  = exp(mle$par[3]),
+        convergence = mle$convergence
+      )
+    }
+  )
   
-  # ottimizzazione per ogni set di dati
-  for (k in 1:K) {
-    opt <- optim(
-      par = c(log(1), 0, 0), 
-      fn = log.lik.vm, 
-      x = xy.tibble %>% pull(paste0("x", k)),
-      y = xy.tibble %>% pull(paste0("y", k))
-    )
-    
-    results[k, ] <- opt$par
-  }
-  colnames(results) <- c("beta.0", "beta.1", "log.kappa")
-  rownames(results) <- paste0("set_", 1:K)
-           
-           return(results)
+  return(results)
 }
 
-simulation(10, 10, -1, 3.5, 10)
+sim_1 <- vonmises_mle_sim(100, 100, -1, 3.5, 10)
+sim_1
+
+#' Verifico se la media dei parametri corrisponde al valore reale del parametro e se la sd ai valori stimati tramite l'inversa dell'Informazione di Fisher
+
+map(.x = sim_1,
+    .f = ~ mean(.x))
+
+map(.x = sim_1, 
+    .f = ~ sd(.x))
 
 #' ## TODO
-#' 
-#' - Calcolare la std degli stimatori di massima verosimiglianza per i parametri
-#'  
-#'    - Lo stimatore è distribuito asintoticamente come una normale con media pari al valore vero del parametro e varianza pari all'inversa dell'informazione attesa di Fisher
-#'    
-#'    - La matrice Hessiana inversa della funzione di log-verosimiglianza è una matrice di varianze e covarianze 
-#'    
-#'    - Le radici quadrate dei valori sulla diagonale sono uguali alle deviazioni standard degli stimatori 
-#'    
-#'    - ci aspettiamo che le deviazioni standard trovate tramite la Hessiana siano pari alle deviazioni standard dei valori stimati nella simulazione e che la media della simulazione sia uguale al valore vero del parametro
 #' 
 #' - Calcolare RMSE e intervalli di confidenza e loro copertura nominale
 #' 
