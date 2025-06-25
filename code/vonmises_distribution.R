@@ -25,11 +25,11 @@ options(warn = -1)
 #'    
 #'      - Per esempio, dire che la media tra 10° e 350° è 180° è assurdo in un contesto circolare, ma potrebbe sembrare corretto se si ignorasse la topologia.
 #' 
-#' La distribuzione di von Mises è stata introdotta da Richard von Mises nel 1918 e la sua PDF è \[ f(x | \mu, \kappa) =  \frac{\exp(k \cos(x - \mu))}{2 \pi I_0(k)} \]
+#' La distribuzione di von Mises è stata introdotta da Richard von Mises nel 1918 e la sua PDF è $$ f(x | \mu, \kappa) =  \frac{\exp(k \cos(x - \mu))}{2 \pi I_0(k)}$$
 #' 
 #'  - x è la variabile aleatoria angolare 
 #'  
-#'  - $\mu$ è la **direzione media** (con $\mu \in [0, 2 \pi) $ ) [È la direzione o nel nostro caso è la variazione della direzione?]
+#'  - $\mu$ è la **direzione media** (con $\mu \in [0, 2 \pi)$)
 #'  
 #'  - $\kappa$ è un parametro di concentrazione della distribuzione, che può assumere valori non negativi ($\kappa \in [0, \infty)$)
 #'  
@@ -90,8 +90,9 @@ options(warn = -1)
 #'  Function `fn` can return `NA` or `Inf` if the function cannot be evaluated at the supplied value, but the initial value must have a computable finite value of fn. (Except for method "L-BFGS-B" where the values should always be finite.)
 #'  
 #'  `optim` can be used recursively, and for a single parameter as well as many. It also accepts a zero-length par, and just evaluates the function with that argument.
-
+#'
 #' ### Stima dei parametri della Von Mises  
+#' 
 #'  Siano $X_1, \dots, X_n$ `n` v.a. iid, con $X_i \sim$ VonMises($\mu, k$)
 #'  
 #'    1. Definisco la funzione di log-verosimiglianza delle $n$ v.a. come sommatoria delle singole log-verosimiglianze in virtù dell'ipotesi i.i.d.
@@ -243,9 +244,3 @@ map(.x = sim_1,
 
 map(.x = sim_1, 
     .f = ~ sd(.x))
-
-#' ## TODO
-#' 
-#' - Calcolare RMSE e intervalli di confidenza e loro copertura nominale
-#' 
-#' - Valutare come cambiano i risultati al variare della sample size

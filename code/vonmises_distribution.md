@@ -32,11 +32,11 @@ La “statistica direzionale” ha numerosi usi nelle scienze
 
 La distribuzione di von Mises è stata introdotta da Richard von Mises
 nel 1918 e la sua PDF è
-$$ f(x | \mu, \kappa) =  \frac{\exp(k \cos(x - \mu))}{2 \pi I_0(k)} $$
+$$ f(x | \mu, \kappa) =  \frac{\exp(k \cos(x - \mu))}{2 \pi I_0(k)}$$
 
 - x è la variabile aleatoria angolare
 
-- $\mu$ è la **direzione media** (con \$
+- $\mu$ è la **direzione media** (con $\mu \in [0, 2 \pi)$)
 
 - $\kappa$ è un parametro di concentrazione della distribuzione, che può
   assumere valori non negativi ($\kappa \in [0, \infty)$)
@@ -156,7 +156,10 @@ values should always be finite.)
 
 `optim` can be used recursively, and for a single parameter as well as
 many. It also accepts a zero-length par, and just evaluates the function
-with that argument. \### Stima dei parametri della Von Mises  
+with that argument.
+
+### Stima dei parametri della Von Mises
+
 Siano $X_1, \dots, X_n$ `n` v.a. iid, con $X_i \sim$ VonMises($\mu, k$)
 
 1.  Definisco la funzione di log-verosimiglianza delle $n$ v.a. come
@@ -191,14 +194,14 @@ optim(
 ```
 
     ## $par
-    ## [1] 0.001982717 7.688294804
+    ## [1] -0.02408383  8.68266089
     ## 
     ## $value
-    ## [1] 43.54115
+    ## [1] 37.00964
     ## 
     ## $counts
     ## function gradient 
-    ##       67       NA 
+    ##       85       NA 
     ## 
     ## $convergence
     ## [1] 0
@@ -214,9 +217,9 @@ circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circu
     ## Call:
     ## circular::mle.vonmises(x = data_rndm, mu = NULL, kappa = NULL,     bias = FALSE, control.circular = list())
     ## 
-    ## mu: 0.001902  ( 0.03735 )
+    ## mu: -0.02397  ( 0.035 )
     ## 
-    ## kappa: 7.686  ( 1.044 )
+    ## kappa: 8.679  ( 1.186 )
 
 ### Stima di una Von Mises con una covariata
 
