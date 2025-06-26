@@ -1,7 +1,7 @@
-Informazioni iniziali
+MLE Von Mises
 ================
 Francesco Invernizzi
-2025-06-25
+2025-06-26
 
 # Von Mises distribution
 
@@ -194,14 +194,14 @@ optim(
 ```
 
     ## $par
-    ## [1] -0.001591691 13.262618582
+    ## [1] 0.0191494 9.4489001
     ## 
     ## $value
-    ## [1] 14.65037
+    ## [1] 32.51089
     ## 
     ## $counts
     ## function gradient 
-    ##      101       NA 
+    ##       73       NA 
     ## 
     ## $convergence
     ## [1] 0
@@ -217,9 +217,9 @@ circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circu
     ## Call:
     ## circular::mle.vonmises(x = data_rndm, mu = NULL, kappa = NULL,     bias = FALSE, control.circular = list())
     ## 
-    ## mu: -0.001635  ( 0.028 )
+    ## mu: 0.01917  ( 0.03347 )
     ## 
-    ## kappa: 13.26  ( 1.837 )
+    ## kappa: 9.443  ( 1.295 )
 
 ### Stima di una Von Mises con una covariata
 
@@ -230,13 +230,8 @@ circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circu
 - $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = (10))$
 
 ``` r
-set.seed(143)
 rndm_x <- rnorm(100)
-rndm_y <- array()
-
-for(i in seq_along(rndm_x)) {
-  rndm_y[i] = circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * rndm_x[i]), kappa = 10)
-}
+rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * xi), kappa = 10))
 ```
 
 2.  Definisco la funzione di log-verosimiglianza
@@ -287,7 +282,7 @@ se
 ```
 
     ##     beta.0     beta.1      kappa 
-    ## 0.05243765 0.15812123 0.13827019
+    ## 0.04995093 0.13589698 0.13843907
 
 ### Simulazione di $K$ repliche per lo stesso set di parametri veri
 
@@ -311,13 +306,9 @@ dei parametri e le righe sono le $K$ simulazioni
 vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
   
   # funzione per generare i set di dati 
-  gen.data <- function(n){
+  gen.data <- function(n, beta.0, beta.1, kappa){
     x <- rnorm(n)
-    y <- c()
-    for (i in 1:n) {
-      y[i] <- circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * x[i]), kappa = kappa)
-    }
-    
+    y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
     data <- tibble(x=x, y=y)
   }
   
@@ -338,12 +329,14 @@ vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
     return(-log.lik)
   }
   
+  datasets <- map(1:K, ~ gen.data(n, beta.0, beta.1, kappa))
+  
   # stima dei parametri 
   results <- map_dfr(
-    .x = map(1:K, ~ gen.data(n)),
+    .x = datasets,
     .f = ~ {
       mle <- optim(
-        par = c(beta.0 = 0, beta.1 = 0, log.kappa = log(1)),
+        par = c(beta.0 = 0, beta.1 = 0, kappa = log(1)),
         fn = log.lik.vm,
         x = .x$x,
         y = .x$y
@@ -358,62 +351,91 @@ vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
     }
   )
   
-  return(results)
+  return(list(results = results, datasets = datasets))
 }
 
 sim_1 <- vonmises_mle_sim(100, 100, -1, 3.5, 10)
-sim_1
+sim_1$results
 ```
 
     ## # A tibble: 100 × 4
-    ##     beta.0  beta.1    kappa convergence
-    ##      <dbl>   <dbl>    <dbl>       <int>
-    ##  1 -1.33    -2.00  2.44e- 1           0
-    ##  2 -0.808    2.80  1.56e+ 0           0
-    ##  3 32.5    -12.4   5.44e-36           0
-    ##  4 -0.939    3.23  1.28e+ 0           0
-    ##  5 10.6     17.2   2.57e-30           0
-    ##  6 -0.985    3.17  1.35e+ 0           0
-    ##  7 -0.734    2.84  1.19e+ 0           0
-    ##  8 -0.0404  -0.156 1.82e- 1           0
-    ##  9 -0.769    2.94  1.54e+ 0           0
-    ## 10  0.411   -2.11  3.02e- 1           0
+    ##    beta.0 beta.1 kappa convergence
+    ##     <dbl>  <dbl> <dbl>       <int>
+    ##  1 -0.874  2.88  1.88            0
+    ##  2 -1.07   3.45  1.26            0
+    ##  3  2.00  -1.13  0.211           0
+    ##  4 -0.820  3.14  1.22            0
+    ##  5  4.27   0.684 0.139           0
+    ##  6 -0.856  3.05  1.29            0
+    ##  7 -0.849  3.37  1.40            0
+    ##  8  6.71   4.67  0.411           0
+    ##  9 -0.884  3.00  1.15            0
+    ## 10  2.40  -2.14  0.328           0
     ## # ℹ 90 more rows
 
-Verifico se la media dei parametri corrisponde al valore reale del
-parametro e se la sd ai valori stimati tramite l’inversa
-dell’Informazione di Fisher
+I risultati della simulazione sono decisamente da quelli che ci si
+potrebbe aspettare. A titolo di esempio, seleziono le righe in cui il
+parametro stimato per `beta.0` esce dall’intervallo $\pm 3 \sigma$ dove
+$\sigma$ corrisponde al valore stimato tramite l’informazione di Fisher
 
 ``` r
-map(.x = sim_1,
-    .f = ~ mean(.x))
+print(
+sim_1$results %>% 
+  filter(!between(beta.0, -1 - 3*se[1], -1 + 3*se[1])),
+n = 50)
 ```
 
-    ## $beta.0
-    ## [1] 174.5847
-    ## 
-    ## $beta.1
-    ## [1] 54.62559
-    ## 
-    ## $kappa
-    ## [1] 0.7351773
-    ## 
-    ## $convergence
-    ## [1] 0
-
-``` r
-map(.x = sim_1, 
-    .f = ~ sd(.x))
-```
-
-    ## $beta.0
-    ## [1] 1722.113
-    ## 
-    ## $beta.1
-    ## [1] 511.4374
-    ## 
-    ## $kappa
-    ## [1] 0.5481125
-    ## 
-    ## $convergence
-    ## [1] 0
+    ## # A tibble: 68 × 4
+    ##         beta.0     beta.1    kappa convergence
+    ##          <dbl>      <dbl>    <dbl>       <int>
+    ##  1      2.00      -1.13   2.11e- 1           0
+    ##  2     -0.820      3.14   1.22e+ 0           0
+    ##  3      4.27       0.684  1.39e- 1           0
+    ##  4     -0.849      3.37   1.40e+ 0           0
+    ##  5      6.71       4.67   4.11e- 1           0
+    ##  6      2.40      -2.14   3.28e- 1           0
+    ##  7      3.61      -1.17   2.07e- 1           0
+    ##  8      5.26       3.54   3.53e- 1           0
+    ##  9      5.15       3.46   3.78e- 1           0
+    ## 10      0.749     -0.405  3.61e- 1           0
+    ## 11     20.4       -6.80   7.94e-28           0
+    ## 12      3.12       0.811  1.58e- 1           0
+    ## 13      7.43       5.04   3.26e- 1           0
+    ## 14     -0.828      3.05   9.17e- 1           0
+    ## 15     -0.760      2.76   1.18e+ 0           0
+    ## 16      5.43       3.43   4.94e- 1           0
+    ## 17     -0.705      2.64   1.28e+ 0           0
+    ## 18     42.5       12.4    1.74e-34           0
+    ## 19      0.231      0.305  2.80e- 1           0
+    ## 20      5.44       3.66   3.37e- 1           0
+    ## 21      4.43       0.934  1.40e- 1           0
+    ## 22      6.06       4.18   5.37e- 1           0
+    ## 23     -0.848      3.04   1.33e+ 0           0
+    ## 24     -0.837      2.99   1.26e+ 0           0
+    ## 25     23          8.03   1.81e-37           0
+    ## 26     -0.192     -0.114  2.23e- 1           0
+    ## 27     42.5       12.4    1.74e-34           0
+    ## 28     -0.838      2.93   1.10e+ 0           0
+    ## 29     -0.790      2.88   1.11e+ 0           0
+    ## 30 367635.     78007.     3.00e- 1           0
+    ## 31      1.50      -0.787  2.92e- 1           0
+    ## 32      0.174      0.102  2.88e- 1           0
+    ## 33      0.337      0.159  1.77e- 1           0
+    ## 34     -0.816      3.26   1.01e+ 0           0
+    ## 35     -0.831      3.30   1.17e+ 0           0
+    ## 36     12.4       22.9    1.74e-34           0
+    ## 37     -0.0701    -0.222  2.31e- 1           0
+    ## 38     -0.759      3.19   1.35e+ 0           0
+    ## 39     -0.798      2.77   1.35e+ 0           0
+    ## 40     39.4       10.7    6.57e-32           0
+    ## 41     -0.827      2.90   1.20e+ 0           0
+    ## 42      5.63       3.59   2.93e- 1           0
+    ## 43     -0.842      3.09   1.33e+ 0           0
+    ## 44     -0.839      3.11   1.20e+ 0           0
+    ## 45     -0.828      3.02   1.28e+ 0           0
+    ## 46      4.21      -0.0148 2.01e- 3          10
+    ## 47     -0.841      2.71   1.45e+ 0           0
+    ## 48     11.7       19.6    2.16e-40           0
+    ## 49     42.5       12.4    1.74e-34           0
+    ## 50      2.37      -0.949  1.88e- 1           0
+    ## # ℹ 18 more rows

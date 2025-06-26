@@ -1,5 +1,5 @@
 #' ---
-#' title: Informazioni iniziali
+#' title: MLE Von Mises
 #' author: Francesco Invernizzi
 #' date: "`r format(Sys.Date())`"
 #' output: github_document
@@ -125,13 +125,9 @@ circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circu
 #' 
 #'    - $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = (10))$
 
-set.seed(143)
 rndm_x <- rnorm(100)
-rndm_y <- array()
+rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * xi), kappa = 10))
 
-for(i in seq_along(rndm_x)) {
-  rndm_y[i] = circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * rndm_x[i]), kappa = 10)
-}
 #'  
 #' 2.   Definisco la funzione di log-verosimiglianza
 log.lik.vm <- function(par, x, y){
@@ -184,13 +180,9 @@ se
 vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
   
   # funzione per generare i set di dati 
-  gen.data <- function(n){
+  gen.data <- function(n, beta.0, beta.1, kappa){
     x <- rnorm(n)
-    y <- c()
-    for (i in 1:n) {
-      y[i] <- circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * x[i]), kappa = kappa)
-    }
-    
+    y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
     data <- tibble(x=x, y=y)
   }
   
@@ -211,12 +203,14 @@ vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
     return(-log.lik)
   }
   
+  datasets <- map(1:K, ~ gen.data(n, beta.0, beta.1, kappa))
+  
   # stima dei parametri 
   results <- map_dfr(
-    .x = map(1:K, ~ gen.data(n)),
+    .x = datasets,
     .f = ~ {
       mle <- optim(
-        par = c(beta.0 = 0, beta.1 = 0, log.kappa = log(1)),
+        par = c(beta.0 = 0, beta.1 = 0, kappa = log(1)),
         fn = log.lik.vm,
         x = .x$x,
         y = .x$y
@@ -231,16 +225,15 @@ vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
     }
   )
   
-  return(results)
+  return(list(results = results, datasets = datasets))
 }
 
 sim_1 <- vonmises_mle_sim(100, 100, -1, 3.5, 10)
-sim_1
+sim_1$results
 
-#' Verifico se la media dei parametri corrisponde al valore reale del parametro e se la sd ai valori stimati tramite l'inversa dell'Informazione di Fisher
+#' I risultati della simulazione sono decisamente da quelli che ci si potrebbe aspettare. A titolo di esempio, seleziono le righe in cui il parametro stimato per `beta.0` esce dall'intervallo $\pm 3 \sigma$ dove $\sigma$ corrisponde al valore stimato tramite l'informazione di Fisher
 
-map(.x = sim_1,
-    .f = ~ mean(.x))
-
-map(.x = sim_1, 
-    .f = ~ sd(.x))
+print(
+sim_1$results %>% 
+  filter(!between(beta.0, -1 - 3*se[1], -1 + 3*se[1])),
+n = 50)
