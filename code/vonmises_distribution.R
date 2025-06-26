@@ -89,35 +89,9 @@ options(warn = -1)
 #'    
 #'  Function `fn` can return `NA` or `Inf` if the function cannot be evaluated at the supplied value, but the initial value must have a computable finite value of fn. (Except for method "L-BFGS-B" where the values should always be finite.)
 #'  
-#'  `optim` can be used recursively, and for a single parameter as well as many. It also accepts a zero-length par, and just evaluates the function with that argument.
-#'
-#' ### Stima dei parametri della Von Mises  
-#' 
-#'  Siano $X_1, \dots, X_n$ `n` v.a. iid, con $X_i \sim$ VonMises($\mu, k$)
-#'  
-#'    1. Definisco la funzione di log-verosimiglianza delle $n$ v.a. come sommatoria delle singole log-verosimiglianze in virtù dell'ipotesi i.i.d.
+#'  `optim` can be used recursively, and for a single parameter as well as many. It also accepts a zero-length par, and just evaluates the function with that argument
 
-log_lik_vm <- function(data, par){
-  log_lik <- sum(circular::dvonmises(data, mu = par[1], kappa = par[2], log = T))
-  return(-log_lik)
-}
-
-#'    2. Estraggo un campione casuale dalla popolazione VM($0, 10$)
-#'
-data_rndm <- circular::rvonmises(n = 100, mu = 0, kappa = 10)
-circular::plot.circular(data_rndm)
-
-#'    3. Minimizzo la funzione di -log-verosimiglianza (e controllo i risultati con mle.vonmises)
-#+ warning = F
-optim(
-  par = c(0,0),
-  fn = log_lik_vm,
-  data = data_rndm,
-)
-
-circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circular=list())
-
-#' ### Stima di una Von Mises con una covariata
+#' ## Stima di una Von Mises con una covariata
 #' 
 #' 1.   Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui 
 #'
@@ -133,17 +107,17 @@ rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 
 log.lik.vm <- function(par, x, y){
   beta.0 <- par[1]
   beta.1 <- par[2]
-  kappa.log <- exp(par[3])
+  kappa <- exp(par[3])
   
   l <- array(dim = length(x))
   
   for(i in seq_along(x)){
-    l[i] = kappa.log * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa.log, nu = 0)))
+    l[i] = kappa * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa, nu = 0)))
   }
   
-  log.lik <- sum(l)
-  return(-log.lik)
+  return(-sum(l))
 }
+
 #'    
 #' 3.   Minimizzo la funione 
 #'      -   `hessian = T` include nei risultati la matrice Hessiana, cioè la matrice di informazione osservata
@@ -157,9 +131,10 @@ result <- optim(
   y = rndm_y, 
   hessian = T)
 
+result$par
+
 det(result$hessian) != 0 # condizione di invertibilità
 cov.matrix <- solve(result$hessian)
-
 se <- sqrt(diag(cov.matrix))
 se
 
@@ -175,42 +150,25 @@ se
 #'  
 #'  * `kappa` = il valore reale del parametro di concentrazione della Von Mises 
 #'  
-#'  Genera $K$ set di random $x$ e random $y$ e stima i parametri ottimizzando la funzione di verosimiglianza per ogni set. La funzione restituisce una tabella in cui le colonne rappresentano i valori stimati dei parametri e le righe sono le $K$ simulazioni
-#'  
-vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
-  
-  # funzione per generare i set di dati 
-  gen.data <- function(n, beta.0, beta.1, kappa){
-    x <- rnorm(n)
-    y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
-    data <- tibble(x=x, y=y)
-  }
-  
-  # definizione della funzione `log.lik`
-  log.lik.vm <- function(par, x, y){
-    
-    beta.0 <- par[1]
-    beta.1 <- par[2]
-    kappa <- exp(par[3])
-    
-    l <- array(dim = length(x))
-    
-    for(i in seq_along(x)){
-      l[i] = kappa * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa, nu = 0)))
-    }
-    
-    log.lik <- sum(l)
-    return(-log.lik)
-  }
-  
-  datasets <- map(1:K, ~ gen.data(n, beta.0, beta.1, kappa))
-  
-  # stima dei parametri 
-  results <- map_dfr(
+#'  Genera $K$ set di random $x$ e random $y$ e stima i parametri ottimizzando la funzione di verosimiglianza per ogni set
+#'  La seguente funzione serve per generare i set di dati 
+gen.data <- function(n, beta.0, beta.1, kappa){
+  x <- rnorm(n)
+  y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
+  data <- tibble(x=x, y=y)
+}
+
+#'  Per riproducibilità genero una sola volta la lista di df e la salvo in un file locale. Il codice per generare la funzione non è incluso nel file per poterlo compilare facilmente.
+#'  -   Inserisco come parametri `n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`, `kappa = 10`
+#'  -   Creo una lista di 100 dataset
+
+load(paste0(dir_data, "/simulazioni.RData"))
+
+results <- map_dfr(
     .x = datasets,
     .f = ~ {
       mle <- optim(
-        par = c(beta.0 = 0, beta.1 = 0, kappa = log(1)),
+        par = c(beta.0 = 0, beta.1 = 0, kappa = log(2)),
         fn = log.lik.vm,
         x = .x$x,
         y = .x$y
@@ -224,16 +182,75 @@ vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
       )
     }
   )
-  
-  return(list(results = results, datasets = datasets))
-}
 
-sim_1 <- vonmises_mle_sim(100, 100, -1, 3.5, 10)
-sim_1$results
+results
 
 #' I risultati della simulazione sono decisamente da quelli che ci si potrebbe aspettare. A titolo di esempio, seleziono le righe in cui il parametro stimato per `beta.0` esce dall'intervallo $\pm 3 \sigma$ dove $\sigma$ corrisponde al valore stimato tramite l'informazione di Fisher
 
 print(
-sim_1$results %>% 
+results %>% 
   filter(!between(beta.0, -1 - 3*se[1], -1 + 3*se[1])),
 n = 50)
+
+#' -  Provo a visualizzare i campioni in cui i parametri sono anomali 
+
+ggplot(data = datasets[[1]]) + 
+  geom_histogram(aes(x)) +
+  theme_classic()
+
+circular::plot.circular(datasets[[1]]$y)
+
+ggplot(data = datasets[[1]]) +
+  geom_point(aes(x, y)) + 
+  theme_classic()
+
+#' -  Profile likelihood dei parametri
+
+x <- datasets[[1]]$x
+y <- datasets[[1]]$y
+
+tibble(
+  beta_0 = seq(from = -15, to = 15, length.out = 1000),
+  neg_log_lik = map_dbl(beta_0, ~ log.lik.vm(par = c(.x, results$beta.1[1], results$kappa[1]), 
+                                         x = x, 
+                                         y = y
+  ))) %>% 
+  ggplot() +
+  geom_line(aes(x = beta_0, y = neg_log_lik)) +
+  theme_classic() +
+  labs(
+    x = expression(beta[0]),
+    y = expression(-log * L(beta[0])),
+    title = expression("Profilo di verosimiglianza per " * beta[0])
+  ) 
+
+tibble(
+  beta_1 = seq(from = -15, to = 15, length.out = 1000),
+  neg_log_lik = map_dbl(beta_1, ~ log.lik.vm(par = c(results$beta.0[1], .x, results$kappa[1]), 
+                                             x = x, 
+                                             y = y
+  ))) %>% 
+  ggplot() +
+  geom_line(aes(x = beta_1, y = neg_log_lik)) +
+  theme_classic() +
+  labs(
+    x = expression(beta[1]),
+    y = expression(-log * L(beta[1])),
+    title = expression("Profilo di verosimiglianza per " * beta[1])
+  ) 
+
+tibble(
+  kappa = seq(from = -15, to = 35, length.out = 1000),
+  neg_log_lik = map_dbl(kappa, ~ log.lik.vm(par = c(results$beta.0[1], results$beta.1[1], .x), 
+                                             x = x, 
+                                             y = y
+  ))) %>% 
+  ggplot() +
+  geom_line(aes(x = kappa, y = neg_log_lik)) +
+  theme_classic() +
+  labs(
+    x = expression(kappa),
+    y = expression(-log * L(kappa)),
+    title = expression("Profilo di verosimiglianza per " * kappa)
+  ) 
+

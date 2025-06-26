@@ -156,72 +156,7 @@ values should always be finite.)
 
 `optim` can be used recursively, and for a single parameter as well as
 many. It also accepts a zero-length par, and just evaluates the function
-with that argument.
-
-### Stima dei parametri della Von Mises
-
-Siano $X_1, \dots, X_n$ `n` v.a. iid, con $X_i \sim$ VonMises($\mu, k$)
-
-1.  Definisco la funzione di log-verosimiglianza delle $n$ v.a. come
-    sommatoria delle singole log-verosimiglianze in virtù dell’ipotesi
-    i.i.d.
-
-``` r
-log_lik_vm <- function(data, par){
-  log_lik <- sum(circular::dvonmises(data, mu = par[1], kappa = par[2], log = T))
-  return(-log_lik)
-}
-```
-
-2.  Estraggo un campione casuale dalla popolazione VM($0, 10$)
-
-``` r
-data_rndm <- circular::rvonmises(n = 100, mu = 0, kappa = 10)
-circular::plot.circular(data_rndm)
-```
-
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
-
-3.  Minimizzo la funzione di -log-verosimiglianza (e controllo i
-    risultati con mle.vonmises)
-
-``` r
-optim(
-  par = c(0,0),
-  fn = log_lik_vm,
-  data = data_rndm,
-)
-```
-
-    ## $par
-    ## [1] 0.0191494 9.4489001
-    ## 
-    ## $value
-    ## [1] 32.51089
-    ## 
-    ## $counts
-    ## function gradient 
-    ##       73       NA 
-    ## 
-    ## $convergence
-    ## [1] 0
-    ## 
-    ## $message
-    ## NULL
-
-``` r
-circular::mle.vonmises(data_rndm, mu=NULL, kappa=NULL, bias=FALSE, control.circular=list())
-```
-
-    ## 
-    ## Call:
-    ## circular::mle.vonmises(x = data_rndm, mu = NULL, kappa = NULL,     bias = FALSE, control.circular = list())
-    ## 
-    ## mu: 0.01917  ( 0.03347 )
-    ## 
-    ## kappa: 9.443  ( 1.295 )
-
-### Stima di una Von Mises con una covariata
+with that argument \## Stima di una Von Mises con una covariata
 
 1.  Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui
 
@@ -240,16 +175,15 @@ rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 
 log.lik.vm <- function(par, x, y){
   beta.0 <- par[1]
   beta.1 <- par[2]
-  kappa.log <- exp(par[3])
+  kappa <- exp(par[3])
   
   l <- array(dim = length(x))
   
   for(i in seq_along(x)){
-    l[i] = kappa.log * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa.log, nu = 0)))
+    l[i] = kappa * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa, nu = 0)))
   }
   
-  log.lik <- sum(l)
-  return(-log.lik)
+  return(-sum(l))
 }
 ```
 
@@ -269,6 +203,13 @@ result <- optim(
   y = rndm_y, 
   hessian = T)
 
+result$par
+```
+
+    ##    beta.0    beta.1     kappa 
+    ## -1.031485  3.367014  2.459555
+
+``` r
 det(result$hessian) != 0 # condizione di invertibilità
 ```
 
@@ -276,13 +217,12 @@ det(result$hessian) != 0 # condizione di invertibilità
 
 ``` r
 cov.matrix <- solve(result$hessian)
-
 se <- sqrt(diag(cov.matrix))
 se
 ```
 
     ##     beta.0     beta.1      kappa 
-    ## 0.04995093 0.13589698 0.13843907
+    ## 0.05104836 0.14179574 0.13804482
 
 ### Simulazione di $K$ repliche per lo stesso set di parametri veri
 
@@ -298,45 +238,31 @@ Definisco una funzione che dati
   Mises
 
 Genera $K$ set di random $x$ e random $y$ e stima i parametri
-ottimizzando la funzione di verosimiglianza per ogni set. La funzione
-restituisce una tabella in cui le colonne rappresentano i valori stimati
-dei parametri e le righe sono le $K$ simulazioni
+ottimizzando la funzione di verosimiglianza per ogni set La seguente
+funzione serve per generare i set di dati
 
 ``` r
-vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
-  
-  # funzione per generare i set di dati 
-  gen.data <- function(n, beta.0, beta.1, kappa){
-    x <- rnorm(n)
-    y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
-    data <- tibble(x=x, y=y)
-  }
-  
-  # definizione della funzione `log.lik`
-  log.lik.vm <- function(par, x, y){
-    
-    beta.0 <- par[1]
-    beta.1 <- par[2]
-    kappa <- exp(par[3])
-    
-    l <- array(dim = length(x))
-    
-    for(i in seq_along(x)){
-      l[i] = kappa * cos(y[i] - 2 * atan(beta.0 + beta.1*x[i])) - log((besselI(kappa, nu = 0)))
-    }
-    
-    log.lik <- sum(l)
-    return(-log.lik)
-  }
-  
-  datasets <- map(1:K, ~ gen.data(n, beta.0, beta.1, kappa))
-  
-  # stima dei parametri 
-  results <- map_dfr(
+gen.data <- function(n, beta.0, beta.1, kappa){
+  x <- rnorm(n)
+  y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
+  data <- tibble(x=x, y=y)
+}
+```
+
+Per riproducibilità genero una sola volta la lista di df e la salvo in
+un file locale. Il codice per generare la funzione non è incluso nel
+file per poterlo compilare facilmente. - Inserisco come parametri
+`n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`, `kappa = 10` - Creo una lista
+di 100 dataset
+
+``` r
+load(paste0(dir_data, "/simulazioni.RData"))
+
+results <- map_dfr(
     .x = datasets,
     .f = ~ {
       mle <- optim(
-        par = c(beta.0 = 0, beta.1 = 0, kappa = log(1)),
+        par = c(beta.0 = 0, beta.1 = 0, kappa = log(2)),
         fn = log.lik.vm,
         x = .x$x,
         y = .x$y
@@ -350,27 +276,23 @@ vonmises_mle_sim <- function(n, K, beta.0, beta.1, kappa){
       )
     }
   )
-  
-  return(list(results = results, datasets = datasets))
-}
 
-sim_1 <- vonmises_mle_sim(100, 100, -1, 3.5, 10)
-sim_1$results
+results
 ```
 
     ## # A tibble: 100 × 4
-    ##    beta.0 beta.1 kappa convergence
-    ##     <dbl>  <dbl> <dbl>       <int>
-    ##  1 -0.874  2.88  1.88            0
-    ##  2 -1.07   3.45  1.26            0
-    ##  3  2.00  -1.13  0.211           0
-    ##  4 -0.820  3.14  1.22            0
-    ##  5  4.27   0.684 0.139           0
-    ##  6 -0.856  3.05  1.29            0
-    ##  7 -0.849  3.37  1.40            0
-    ##  8  6.71   4.67  0.411           0
-    ##  9 -0.884  3.00  1.15            0
-    ## 10  2.40  -2.14  0.328           0
+    ##    beta.0 beta.1    kappa convergence
+    ##     <dbl>  <dbl>    <dbl>       <int>
+    ##  1  5.55    3.73 3.91e- 1           0
+    ##  2  5.50    3.68 3.36e- 1           0
+    ##  3 13.3    46.0  1.99e-36           0
+    ##  4 13.3    46.0  1.99e-36           0
+    ##  5  7.03   19.2  2.14e-25           0
+    ##  6 -0.907   3.21 1.18e+ 0           0
+    ##  7 29.5     8.57 7.96e-24           0
+    ##  8  5.50    3.65 3.17e- 1           0
+    ##  9 13.3    46.0  1.99e-36           0
+    ## 10 11.9    48.9  4.03e-40           0
     ## # ℹ 90 more rows
 
 I risultati della simulazione sono decisamente da quelli che ci si
@@ -380,62 +302,150 @@ $\sigma$ corrisponde al valore stimato tramite l’informazione di Fisher
 
 ``` r
 print(
-sim_1$results %>% 
+results %>% 
   filter(!between(beta.0, -1 - 3*se[1], -1 + 3*se[1])),
 n = 50)
 ```
 
-    ## # A tibble: 68 × 4
-    ##         beta.0     beta.1    kappa convergence
-    ##          <dbl>      <dbl>    <dbl>       <int>
-    ##  1      2.00      -1.13   2.11e- 1           0
-    ##  2     -0.820      3.14   1.22e+ 0           0
-    ##  3      4.27       0.684  1.39e- 1           0
-    ##  4     -0.849      3.37   1.40e+ 0           0
-    ##  5      6.71       4.67   4.11e- 1           0
-    ##  6      2.40      -2.14   3.28e- 1           0
-    ##  7      3.61      -1.17   2.07e- 1           0
-    ##  8      5.26       3.54   3.53e- 1           0
-    ##  9      5.15       3.46   3.78e- 1           0
-    ## 10      0.749     -0.405  3.61e- 1           0
-    ## 11     20.4       -6.80   7.94e-28           0
-    ## 12      3.12       0.811  1.58e- 1           0
-    ## 13      7.43       5.04   3.26e- 1           0
-    ## 14     -0.828      3.05   9.17e- 1           0
-    ## 15     -0.760      2.76   1.18e+ 0           0
-    ## 16      5.43       3.43   4.94e- 1           0
-    ## 17     -0.705      2.64   1.28e+ 0           0
-    ## 18     42.5       12.4    1.74e-34           0
-    ## 19      0.231      0.305  2.80e- 1           0
-    ## 20      5.44       3.66   3.37e- 1           0
-    ## 21      4.43       0.934  1.40e- 1           0
-    ## 22      6.06       4.18   5.37e- 1           0
-    ## 23     -0.848      3.04   1.33e+ 0           0
-    ## 24     -0.837      2.99   1.26e+ 0           0
-    ## 25     23          8.03   1.81e-37           0
-    ## 26     -0.192     -0.114  2.23e- 1           0
-    ## 27     42.5       12.4    1.74e-34           0
-    ## 28     -0.838      2.93   1.10e+ 0           0
-    ## 29     -0.790      2.88   1.11e+ 0           0
-    ## 30 367635.     78007.     3.00e- 1           0
-    ## 31      1.50      -0.787  2.92e- 1           0
-    ## 32      0.174      0.102  2.88e- 1           0
-    ## 33      0.337      0.159  1.77e- 1           0
-    ## 34     -0.816      3.26   1.01e+ 0           0
-    ## 35     -0.831      3.30   1.17e+ 0           0
-    ## 36     12.4       22.9    1.74e-34           0
-    ## 37     -0.0701    -0.222  2.31e- 1           0
-    ## 38     -0.759      3.19   1.35e+ 0           0
-    ## 39     -0.798      2.77   1.35e+ 0           0
-    ## 40     39.4       10.7    6.57e-32           0
-    ## 41     -0.827      2.90   1.20e+ 0           0
-    ## 42      5.63       3.59   2.93e- 1           0
-    ## 43     -0.842      3.09   1.33e+ 0           0
-    ## 44     -0.839      3.11   1.20e+ 0           0
-    ## 45     -0.828      3.02   1.28e+ 0           0
-    ## 46      4.21      -0.0148 2.01e- 3          10
-    ## 47     -0.841      2.71   1.45e+ 0           0
-    ## 48     11.7       19.6    2.16e-40           0
-    ## 49     42.5       12.4    1.74e-34           0
-    ## 50      2.37      -0.949  1.88e- 1           0
-    ## # ℹ 18 more rows
+    ## # A tibble: 79 × 4
+    ##    beta.0  beta.1    kappa convergence
+    ##     <dbl>   <dbl>    <dbl>       <int>
+    ##  1  5.55    3.73  3.91e- 1           0
+    ##  2  5.50    3.68  3.36e- 1           0
+    ##  3 13.3    46.0   1.99e-36           0
+    ##  4 13.3    46.0   1.99e-36           0
+    ##  5  7.03   19.2   2.14e-25           0
+    ##  6 29.5     8.57  7.96e-24           0
+    ##  7  5.50    3.65  3.17e- 1           0
+    ##  8 13.3    46.0   1.99e-36           0
+    ##  9 11.9    48.9   4.03e-40           0
+    ## 10  7.92   31.8   4.30e-26           0
+    ## 11 30.1   -10.4   6.84e- 2           0
+    ## 12 13.3    46.0   1.99e-36           0
+    ## 13  5.69    3.85  3.50e- 1           0
+    ## 14  9.25    2.79  3.37e- 2           0
+    ## 15 13.3    46.0   1.99e-36           0
+    ## 16 13.3    46.0   1.99e-36           0
+    ## 17  6.53    4.50  2.62e- 1           0
+    ## 18  8.73   44.2   1.04e-30           0
+    ## 19 10.8    16.2   8.93e-29           0
+    ## 20 11.9    48.9   4.03e-40           0
+    ## 21  6.42   32.1   1.60e-22           0
+    ## 22 13.3    46.0   1.99e-36           0
+    ## 23 13.3    46.0   1.99e-36           0
+    ## 24 41.6    10.4   3.88e-33           0
+    ## 25  8.73   44.2   1.04e-30           0
+    ## 26  5.50    3.64  3.62e- 1           0
+    ## 27 41.6    10.4   3.88e-33           0
+    ## 28 29.5     8.57  7.96e-24           0
+    ## 29 13.3    46.0   1.99e-36           0
+    ## 30 11.9    48.9   4.03e-40           0
+    ## 31 13.3    46.0   1.99e-36           0
+    ## 32 10.8    16.2   8.93e-29           0
+    ## 33 10.8    16.2   8.93e-29           0
+    ## 34  7.03   19.2   2.14e-25           0
+    ## 35  5.28    3.53  2.82e- 1           0
+    ## 36  5.72    3.85  1.94e- 1           0
+    ## 37  8.43   28.8   8.84e-25           0
+    ## 38 10.8    16.2   8.93e-29           0
+    ## 39 11.9    48.9   4.03e-40           0
+    ## 40  8.73   44.2   1.04e-30           0
+    ## 41 13.3    46.0   1.99e-36           0
+    ## 42 13.3    46.0   1.99e-36           0
+    ## 43 13.3    46.0   1.99e-36           0
+    ## 44  5.63    3.78  2.43e- 1           0
+    ## 45  5.81    3.93  3.75e- 1           0
+    ## 46 29.5     8.57  7.96e-24           0
+    ## 47 13.3    46.0   1.99e-36           0
+    ## 48  5.83    3.93  3.44e- 1           0
+    ## 49  0.181  -0.444 9.33e- 2           0
+    ## 50 13.3    46.0   1.99e-36           0
+    ## # ℹ 29 more rows
+
+- Provo a visualizzare i campioni in cui i parametri sono anomali
+
+``` r
+ggplot(data = datasets[[1]]) + 
+  geom_histogram(aes(x)) +
+  theme_classic()
+```
+
+    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+``` r
+circular::plot.circular(datasets[[1]]$y)
+```
+
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-7-2.png)<!-- -->
+
+``` r
+ggplot(data = datasets[[1]]) +
+  geom_point(aes(x, y)) + 
+  theme_classic()
+```
+
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-7-3.png)<!-- -->
+
+- Profile likelihood dei parametri
+
+``` r
+x <- datasets[[1]]$x
+y <- datasets[[1]]$y
+
+tibble(
+  beta_0 = seq(from = -15, to = 15, length.out = 1000),
+  neg_log_lik = map_dbl(beta_0, ~ log.lik.vm(par = c(.x, results$beta.1[1], results$kappa[1]), 
+                                         x = x, 
+                                         y = y
+  ))) %>% 
+  ggplot() +
+  geom_line(aes(x = beta_0, y = neg_log_lik)) +
+  theme_classic() +
+  labs(
+    x = expression(beta[0]),
+    y = expression(-log * L(beta[0])),
+    title = expression("Profilo di verosimiglianza per " * beta[0])
+  ) 
+```
+
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+``` r
+tibble(
+  beta_1 = seq(from = -15, to = 15, length.out = 1000),
+  neg_log_lik = map_dbl(beta_1, ~ log.lik.vm(par = c(results$beta.0[1], .x, results$kappa[1]), 
+                                             x = x, 
+                                             y = y
+  ))) %>% 
+  ggplot() +
+  geom_line(aes(x = beta_1, y = neg_log_lik)) +
+  theme_classic() +
+  labs(
+    x = expression(beta[1]),
+    y = expression(-log * L(beta[1])),
+    title = expression("Profilo di verosimiglianza per " * beta[1])
+  ) 
+```
+
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-2.png)<!-- -->
+
+``` r
+tibble(
+  kappa = seq(from = -15, to = 35, length.out = 1000),
+  neg_log_lik = map_dbl(kappa, ~ log.lik.vm(par = c(results$beta.0[1], results$beta.1[1], .x), 
+                                             x = x, 
+                                             y = y
+  ))) %>% 
+  ggplot() +
+  geom_line(aes(x = kappa, y = neg_log_lik)) +
+  theme_classic() +
+  labs(
+    x = expression(kappa),
+    y = expression(-log * L(kappa)),
+    title = expression("Profilo di verosimiglianza per " * kappa)
+  ) 
+```
+
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-3.png)<!-- -->
