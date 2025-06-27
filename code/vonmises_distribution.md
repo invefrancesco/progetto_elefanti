@@ -1,7 +1,7 @@
 MLE Von Mises
 ================
 Francesco Invernizzi
-2025-06-26
+2025-06-27
 
 # Von Mises distribution
 
@@ -156,20 +156,23 @@ values should always be finite.)
 
 `optim` can be used recursively, and for a single parameter as well as
 many. It also accepts a zero-length par, and just evaluates the function
-with that argument \## Stima di una Von Mises con una covariata
+with that argument
 
-1.  Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui
+## Stima di una Von Mises con una covariata
+
+Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui
 
 - $X_i \sim N(0, 1)$
 
-- $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = (10))$
+- $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = 10)$
+  con $\beta_0=-1$, $\beta_1 = 3.5$
 
 ``` r
 rndm_x <- rnorm(100)
 rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * xi), kappa = 10))
 ```
 
-2.  Definisco la funzione di log-verosimiglianza
+Definisco la funzione di - log-verosimiglianza
 
 ``` r
 log.lik.vm <- function(par, x, y){
@@ -187,27 +190,25 @@ log.lik.vm <- function(par, x, y){
 }
 ```
 
-3.  Minimizzo la funione
-    - `hessian = T` include nei risultati la matrice Hessiana, cioè la
-      matrice di informazione osservata
-    - Se questa matrice è invertibile, corrisponde asintoticamente alla
-      matrice di varianza e covarianza dei parametri
-    - La radice quadrata dei valori sulla diagonale principale,
-      corrispondo agli standard error asintotici dei parametri
+Minimizzo la funione con `optim`
 
 ``` r
 result <- optim(
-  par = c(beta.0 = 0, beta.1 = 0, kappa = log(1)),
+  par = c(beta.0 = 0, beta.1 = 0, kappa = log(2)),
   fn = log.lik.vm,
   x = rndm_x,
   y = rndm_y, 
   hessian = T)
+```
 
+risultati:
+
+``` r
 result$par
 ```
 
-    ##    beta.0    beta.1     kappa 
-    ## -1.031485  3.367014  2.459555
+    ##     beta.0     beta.1      kappa 
+    ## -0.8978552  3.2049383  2.3075716
 
 ``` r
 det(result$hessian) != 0 # condizione di invertibilità
@@ -218,28 +219,40 @@ det(result$hessian) != 0 # condizione di invertibilità
 ``` r
 cov.matrix <- solve(result$hessian)
 se <- sqrt(diag(cov.matrix))
+```
+
+standard error:
+
+``` r
 se
 ```
 
     ##     beta.0     beta.1      kappa 
-    ## 0.05104836 0.14179574 0.13804482
+    ## 0.05140479 0.14656494 0.13740440
+
+Nota esplicativa:
+
+- Il parametro `kappa` è stimato in scala logaritmica per garantire che
+  il valore restituito sia sempre positivo. Il valore `par[3]`
+  rappresenta quindi il logaritmo naturale del parametro reale, e viene
+  esponenziato all’interno della funzione di verosimiglianza.
+- Impostando `hessian = TRUE`, `optim()` restituisce anche la **matrice
+  Hessiana** della funzione obiettivo valutata nel punto di minimo, che
+  corrisponde (sotto opportune condizioni regolarità) alla **matrice di
+  informazione osservata**.
+- Se questa matrice Hessiana è invertibile, la sua inversa fornisce una
+  **stima asintotica della matrice di varianza-covarianza** dei
+  parametri stimati.
+- Le **radici quadrate degli elementi diagonali** della matrice inversa
+  corrispondono agli **errori standard asintotici** delle stime dei
+  parametri.
 
 ### Simulazione di $K$ repliche per lo stesso set di parametri veri
 
-Definisco una funzione che dati
+Genero $K$ set di dati random e stimo i parametri che massimizzano la
+verosimiglianza per ogni set di dati
 
-- `n` = la numerosità del campione casuale
-
-- `K` = il numero di repliche
-
-- `beta.0` e `beta.1` = il valore reale dei parametri
-
-- `kappa` = il valore reale del parametro di concentrazione della Von
-  Mises
-
-Genera $K$ set di random $x$ e random $y$ e stima i parametri
-ottimizzando la funzione di verosimiglianza per ogni set La seguente
-funzione serve per generare i set di dati
+- La seguente funzione genera i set di dati:
 
 ``` r
 gen.data <- function(n, beta.0, beta.1, kappa){
@@ -249,11 +262,14 @@ gen.data <- function(n, beta.0, beta.1, kappa){
 }
 ```
 
-Per riproducibilità genero una sola volta la lista di df e la salvo in
-un file locale. Il codice per generare la funzione non è incluso nel
-file per poterlo compilare facilmente. - Inserisco come parametri
-`n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`, `kappa = 10` - Creo una lista
-di 100 dataset
+- Per riproducibilità genero una sola volta la lista di df e la salvo in
+  un file locale. Il codice per generare la funzione non è incluso nel
+  file per poterlo compilare facilmente.
+
+- Inserisco come parametri `n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`,
+  `kappa = 10`
+
+- Creo una lista di 100 dataset
 
 ``` r
 load(paste0(dir_data, "/simulazioni.RData"))
@@ -295,74 +311,10 @@ results
     ## 10 11.9    48.9  4.03e-40           0
     ## # ℹ 90 more rows
 
-I risultati della simulazione sono decisamente da quelli che ci si
-potrebbe aspettare. A titolo di esempio, seleziono le righe in cui il
-parametro stimato per `beta.0` esce dall’intervallo $\pm 3 \sigma$ dove
-$\sigma$ corrisponde al valore stimato tramite l’informazione di Fisher
+I risultati della simulazione sono decisamente diversi da quelli che ci
+si potrebbe aspettare.
 
-``` r
-print(
-results %>% 
-  filter(!between(beta.0, -1 - 3*se[1], -1 + 3*se[1])),
-n = 50)
-```
-
-    ## # A tibble: 79 × 4
-    ##    beta.0  beta.1    kappa convergence
-    ##     <dbl>   <dbl>    <dbl>       <int>
-    ##  1  5.55    3.73  3.91e- 1           0
-    ##  2  5.50    3.68  3.36e- 1           0
-    ##  3 13.3    46.0   1.99e-36           0
-    ##  4 13.3    46.0   1.99e-36           0
-    ##  5  7.03   19.2   2.14e-25           0
-    ##  6 29.5     8.57  7.96e-24           0
-    ##  7  5.50    3.65  3.17e- 1           0
-    ##  8 13.3    46.0   1.99e-36           0
-    ##  9 11.9    48.9   4.03e-40           0
-    ## 10  7.92   31.8   4.30e-26           0
-    ## 11 30.1   -10.4   6.84e- 2           0
-    ## 12 13.3    46.0   1.99e-36           0
-    ## 13  5.69    3.85  3.50e- 1           0
-    ## 14  9.25    2.79  3.37e- 2           0
-    ## 15 13.3    46.0   1.99e-36           0
-    ## 16 13.3    46.0   1.99e-36           0
-    ## 17  6.53    4.50  2.62e- 1           0
-    ## 18  8.73   44.2   1.04e-30           0
-    ## 19 10.8    16.2   8.93e-29           0
-    ## 20 11.9    48.9   4.03e-40           0
-    ## 21  6.42   32.1   1.60e-22           0
-    ## 22 13.3    46.0   1.99e-36           0
-    ## 23 13.3    46.0   1.99e-36           0
-    ## 24 41.6    10.4   3.88e-33           0
-    ## 25  8.73   44.2   1.04e-30           0
-    ## 26  5.50    3.64  3.62e- 1           0
-    ## 27 41.6    10.4   3.88e-33           0
-    ## 28 29.5     8.57  7.96e-24           0
-    ## 29 13.3    46.0   1.99e-36           0
-    ## 30 11.9    48.9   4.03e-40           0
-    ## 31 13.3    46.0   1.99e-36           0
-    ## 32 10.8    16.2   8.93e-29           0
-    ## 33 10.8    16.2   8.93e-29           0
-    ## 34  7.03   19.2   2.14e-25           0
-    ## 35  5.28    3.53  2.82e- 1           0
-    ## 36  5.72    3.85  1.94e- 1           0
-    ## 37  8.43   28.8   8.84e-25           0
-    ## 38 10.8    16.2   8.93e-29           0
-    ## 39 11.9    48.9   4.03e-40           0
-    ## 40  8.73   44.2   1.04e-30           0
-    ## 41 13.3    46.0   1.99e-36           0
-    ## 42 13.3    46.0   1.99e-36           0
-    ## 43 13.3    46.0   1.99e-36           0
-    ## 44  5.63    3.78  2.43e- 1           0
-    ## 45  5.81    3.93  3.75e- 1           0
-    ## 46 29.5     8.57  7.96e-24           0
-    ## 47 13.3    46.0   1.99e-36           0
-    ## 48  5.83    3.93  3.44e- 1           0
-    ## 49  0.181  -0.444 9.33e- 2           0
-    ## 50 13.3    46.0   1.99e-36           0
-    ## # ℹ 29 more rows
-
-- Provo a visualizzare i campioni in cui i parametri sono anomali
+- Provo a visualizzare il primo campione
 
 ``` r
 ggplot(data = datasets[[1]]) + 
@@ -372,13 +324,13 @@ ggplot(data = datasets[[1]]) +
 
     ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ``` r
 circular::plot.circular(datasets[[1]]$y)
 ```
 
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-7-2.png)<!-- -->
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-2.png)<!-- -->
 
 ``` r
 ggplot(data = datasets[[1]]) +
@@ -386,9 +338,11 @@ ggplot(data = datasets[[1]]) +
   theme_classic()
 ```
 
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-7-3.png)<!-- -->
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-3.png)<!-- -->
 
 - Profile likelihood dei parametri
+  - Faccio il grafico della - log-liklihood per ognuno dei parametri,
+    fissati gli altri due nei punti stimati da `optim`
 
 ``` r
 x <- datasets[[1]]$x
@@ -410,7 +364,7 @@ tibble(
   ) 
 ```
 
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ``` r
 tibble(
@@ -429,7 +383,7 @@ tibble(
   ) 
 ```
 
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-2.png)<!-- -->
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->
 
 ``` r
 tibble(
@@ -445,7 +399,7 @@ tibble(
     x = expression(kappa),
     y = expression(-log * L(kappa)),
     title = expression("Profilo di verosimiglianza per " * kappa)
-  ) 
+  )
 ```
 
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-3.png)<!-- -->
+![](vonmises_distribution_files/figure-gfm/unnamed-chunk-9-3.png)<!-- -->

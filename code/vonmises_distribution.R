@@ -90,20 +90,20 @@ options(warn = -1)
 #'  Function `fn` can return `NA` or `Inf` if the function cannot be evaluated at the supplied value, but the initial value must have a computable finite value of fn. (Except for method "L-BFGS-B" where the values should always be finite.)
 #'  
 #'  `optim` can be used recursively, and for a single parameter as well as many. It also accepts a zero-length par, and just evaluates the function with that argument
-
+#'
 #' ## Stima di una Von Mises con una covariata
 #' 
-#' 1.   Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui 
+#' Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui 
 #'
-#'    - $X_i \sim N(0, 1)$
+#' -  $X_i \sim N(0, 1)$
 #' 
-#'    - $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = (10))$
+#' -  $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = 10)$ con $\beta_0=-1$, $\beta_1 = 3.5$
 
 rndm_x <- rnorm(100)
 rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * xi), kappa = 10))
 
 #'  
-#' 2.   Definisco la funzione di log-verosimiglianza
+#' Definisco la funzione di - log-verosimiglianza
 log.lik.vm <- function(par, x, y){
   beta.0 <- par[1]
   beta.1 <- par[2]
@@ -118,54 +118,47 @@ log.lik.vm <- function(par, x, y){
   return(-sum(l))
 }
 
-#'    
-#' 3.   Minimizzo la funione 
-#'      -   `hessian = T` include nei risultati la matrice Hessiana, cioè la matrice di informazione osservata
-#'      -   Se questa matrice è invertibile, corrisponde asintoticamente alla matrice di varianza e covarianza dei parametri 
-#'      -   La radice quadrata dei valori sulla diagonale principale, corrispondo agli standard error asintotici dei parametri 
+#' Minimizzo la funione con `optim`
 
 result <- optim(
-  par = c(beta.0 = 0, beta.1 = 0, kappa = log(1)),
+  par = c(beta.0 = 0, beta.1 = 0, kappa = log(2)),
   fn = log.lik.vm,
   x = rndm_x,
   y = rndm_y, 
   hessian = T)
-
+#' risultati:
 result$par
 
 det(result$hessian) != 0 # condizione di invertibilità
 cov.matrix <- solve(result$hessian)
 se <- sqrt(diag(cov.matrix))
+#' standard error: 
 se
 
+#' Nota esplicativa: 
+#' 
+#' - Il parametro `kappa` è stimato in scala logaritmica per garantire che il valore restituito sia sempre positivo. Il valore `par[3]` rappresenta quindi il logaritmo naturale del parametro reale, e viene esponenziato all'interno della funzione di verosimiglianza.
+#' - Impostando `hessian = TRUE`, `optim()` restituisce anche la **matrice Hessiana** della funzione obiettivo valutata nel punto di minimo, che corrisponde (sotto opportune condizioni regolarità) alla **matrice di informazione osservata**.
+#' - Se questa matrice Hessiana è invertibile, la sua inversa fornisce una **stima asintotica della matrice di varianza-covarianza** dei parametri stimati.
+#' - Le **radici quadrate degli elementi diagonali** della matrice inversa corrispondono agli **errori standard asintotici** delle stime dei parametri.
+#' 
 #' ### Simulazione di $K$ repliche per lo stesso set di parametri veri
 #' 
-#' Definisco una funzione che dati 
+#' Genero $K$ set di dati random e stimo i parametri che massimizzano la verosimiglianza per ogni set di dati 
 #' 
-#'  * `n` = la numerosità del campione casuale 
-#'  
-#'  * `K` = il numero di repliche 
-#'  
-#'  * `beta.0` e `beta.1` = il valore reale dei parametri 
-#'  
-#'  * `kappa` = il valore reale del parametro di concentrazione della Von Mises 
-#'  
-#'  Genera $K$ set di random $x$ e random $y$ e stima i parametri ottimizzando la funzione di verosimiglianza per ogni set
-#'  La seguente funzione serve per generare i set di dati 
+#'  - La seguente funzione genera i set di dati:
 gen.data <- function(n, beta.0, beta.1, kappa){
   x <- rnorm(n)
-  y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
+  y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu= 2*atan(beta.0 + beta.1 * xi), kappa = kappa))
   data <- tibble(x=x, y=y)
 }
 
-#'  Per riproducibilità genero una sola volta la lista di df e la salvo in un file locale. Il codice per generare la funzione non è incluso nel file per poterlo compilare facilmente.
-#'  -   Inserisco come parametri `n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`, `kappa = 10`
-#'  -   Creo una lista di 100 dataset
+#' - Per riproducibilità genero una sola volta una lista di $K = 100$ `tibble` inserendo come come parametri `n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`, `kappa = 10` e la salvo in un file chiamato `simulazioni.RData`
 
 load(paste0(dir_data, "/simulazioni.RData"))
 
 results <- map_dfr(
-    .x = datasets,
+    .x = sim_1,
     .f = ~ {
       mle <- optim(
         par = c(beta.0 = 0, beta.1 = 0, kappa = log(2)),
@@ -185,14 +178,7 @@ results <- map_dfr(
 
 results
 
-#' I risultati della simulazione sono decisamente da quelli che ci si potrebbe aspettare. A titolo di esempio, seleziono le righe in cui il parametro stimato per `beta.0` esce dall'intervallo $\pm 3 \sigma$ dove $\sigma$ corrisponde al valore stimato tramite l'informazione di Fisher
-
-print(
-results %>% 
-  filter(!between(beta.0, -1 - 3*se[1], -1 + 3*se[1])),
-n = 50)
-
-#' -  Provo a visualizzare i campioni in cui i parametri sono anomali 
+#' I risultati della simulazione sono decisamente diversi da quelli che ci si potrebbe aspettare. 
 
 ggplot(data = datasets[[1]]) + 
   geom_histogram(aes(x)) +
@@ -205,6 +191,7 @@ ggplot(data = datasets[[1]]) +
   theme_classic()
 
 #' -  Profile likelihood dei parametri
+#'    -   Faccio il grafico della - log-liklihood per ognuno dei parametri, fissati gli altri due nei punti stimati da `optim` 
 
 x <- datasets[[1]]$x
 y <- datasets[[1]]$y
@@ -252,5 +239,4 @@ tibble(
     x = expression(kappa),
     y = expression(-log * L(kappa)),
     title = expression("Profilo di verosimiglianza per " * kappa)
-  ) 
-
+  )
