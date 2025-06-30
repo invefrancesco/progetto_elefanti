@@ -233,9 +233,9 @@ result_df %>%
 
 | Parameter | Estimate | Std. Error | 95% CI Lower | 95% CI Upper |
 |:----------|:--------:|:----------:|:------------:|:------------:|
-| beta 0    | -0.9915  |   0.0199   |   -1.0305    |   -0.9525    |
-| beta 1    |  3.4308  |   0.0548   |    3.3234    |    3.5382    |
-| kappa     |  2.2355  |   0.0433   |    2.1506    |    2.3205    |
+| beta 0    | -1.0087  |   0.0185   |   -1.0450    |   -0.9724    |
+| beta 1    |  3.5328  |   0.0509   |    3.4330    |    3.6327    |
+| kappa     |  2.3701  |   0.0435   |    2.2847    |    2.4554    |
 
 Nota esplicativa:
 
@@ -311,7 +311,7 @@ Visualizzo i risultati
 
 ``` r
 summary_df <- tibble(
-  Parameter = c("beta[0]", "beta[1]", "kappa"),
+  Parameter = c("beta 0", "beta 1", "kappa"),
   Mean      = c(mean(results$beta.0), mean(results$beta.1), mean(results$kappa)),
   `Std. Dev` = c(sd(results$beta.0), sd(results$beta.1), sd(results$kappa)),
   `2.5%`    = c(quantile(results$beta.0, 0.025),
@@ -334,12 +334,8 @@ summary_df %>%
 
 | Parameter |  Mean   | Std. Dev |  2.5%   |  97.5%  |
 |:----------|:-------:|:--------:|:-------:|:-------:|
-| beta\[0\] | -1.0001 |  0.0198  | -1.0386 | -0.9616 |
-| beta\[1\] | 3.5010  |  0.0558  | 3.3933  | 3.6093  |
+| beta 0    | -1.0001 |  0.0198  | -1.0386 | -0.9616 |
+| beta 1    | 3.5010  |  0.0558  | 3.3933  | 3.6093  |
 | kappa     | 10.0305 |  0.4347  | 9.2221  | 10.9423 |
 
 Summary statistics across the 1000 simulated replications
-
-TODO
-
--\[\] Intervalli di confidenza nominali

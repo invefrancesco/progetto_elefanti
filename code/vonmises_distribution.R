@@ -216,7 +216,3 @@ summary_df %>%
     col.names = c("Parameter", "Mean", "Std. Dev", "2.5%", "97.5%"),
     format = "markdown"
   )
-
-#' TODO
-#' 
-#' -[] Intervalli di confidenza nominali
