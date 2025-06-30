@@ -15,7 +15,9 @@ pacman::p_load(
 	sf,								# provides simple features access for R
 	amt,              #   manage and analyze animal movement data
 	lubridate,       # parse and manipulate dates
-	circular # for circular data
+	circular, # for circular data
+	knitr,
+	kableExtra  # 
 )
 
 # set folder paths ----

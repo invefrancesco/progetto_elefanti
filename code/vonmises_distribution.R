@@ -99,7 +99,8 @@ options(warn = -1)
 #' 
 #' -  $Y_i \sim VonMises(\mu = 2atan(\beta_0 +\beta_1 \cdot x_i), k = 10)$ con $\beta_0=-1$, $\beta_1 = 3.5$
 
-rndm_x <- rnorm(100)
+rndm_x <- rnorm(1000)
+
 rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * xi), kappa = 10))
 
 #'  
@@ -126,14 +127,30 @@ result <- optim(
   x = rndm_x,
   y = rndm_y, 
   hessian = T)
-#' risultati:
-result$par
 
+# Standard error
 det(result$hessian) != 0 # condizione di invertibilità
 cov.matrix <- solve(result$hessian)
 se <- sqrt(diag(cov.matrix))
-#' standard error: 
-se
+
+# Intervalli di confidenza asintotici (95%)
+result_df <- tibble(
+  parametri = c("beta 0", "beta 1", "kappa"), 
+  estimate = result$par,
+  se = se,
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+)
+
+# Tabella 
+
+result_df %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  kable(
+    col.names = c("Parameter", "Estimate", "Std. Error", "95% CI Lower", "95% CI Upper"),
+    align = "lcccc",
+    format = "markdown"
+  )
 
 #' Nota esplicativa: 
 #' 
@@ -142,7 +159,7 @@ se
 #' - Se questa matrice Hessiana è invertibile, la sua inversa fornisce una **stima asintotica della matrice di varianza-covarianza** dei parametri stimati.
 #' - Le **radici quadrate degli elementi diagonali** della matrice inversa corrispondono agli **errori standard asintotici** delle stime dei parametri.
 #' 
-#' ### Simulazione di $K$ repliche per lo stesso set di parametri veri
+#' ## Simulazione di $K$ repliche per lo stesso set di parametri veri
 #' 
 #' Genero $K$ set di dati random e stimo i parametri che massimizzano la verosimiglianza per ogni set di dati 
 #' 
@@ -153,9 +170,9 @@ gen.data <- function(n, beta.0, beta.1, kappa){
   data <- tibble(x=x, y=y)
 }
 
-#' - Per riproducibilità genero una sola volta una lista di $K = 100$ `tibble` inserendo come come parametri `n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`, `kappa = 10` e la salvo in un file chiamato `simulazioni.RData`
+#' - Per riproducibilità genero una sola volta una lista di $K = 1000$ `tibble` inserendo come come parametri `n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`, `kappa = 10` e la salvo in un file chiamato `sim_1.RData`
 
-load(paste0(dir_data, "/simulazioni.RData"))
+load(paste0(dir_data, "/sim_1.RData"))
 
 results <- map_dfr(
     .x = sim_1,
@@ -176,67 +193,30 @@ results <- map_dfr(
     }
   )
 
-results
+summary(results)
 
-#' I risultati della simulazione sono decisamente diversi da quelli che ci si potrebbe aspettare. 
+#' Visualizzo i risultati 
+summary_df <- tibble(
+  Parameter = c("beta 0", "beta 1", "kappa"),
+  Mean      = c(mean(results$beta.0), mean(results$beta.1), mean(results$kappa)),
+  `Std. Dev` = c(sd(results$beta.0), sd(results$beta.1), sd(results$kappa)),
+  `2.5%`    = c(quantile(results$beta.0, 0.025),
+                quantile(results$beta.1, 0.025),
+                quantile(results$kappa, 0.025)),
+  `97.5%`   = c(quantile(results$beta.0, 0.975),
+                quantile(results$beta.1, 0.975),
+                quantile(results$kappa, 0.975))
+)
 
-ggplot(data = datasets[[1]]) + 
-  geom_histogram(aes(x)) +
-  theme_classic()
-
-circular::plot.circular(datasets[[1]]$y)
-
-ggplot(data = datasets[[1]]) +
-  geom_point(aes(x, y)) + 
-  theme_classic()
-
-#' -  Profile likelihood dei parametri
-#'    -   Faccio il grafico della - log-liklihood per ognuno dei parametri, fissati gli altri due nei punti stimati da `optim` 
-
-x <- datasets[[1]]$x
-y <- datasets[[1]]$y
-
-tibble(
-  beta_0 = seq(from = -15, to = 15, length.out = 1000),
-  neg_log_lik = map_dbl(beta_0, ~ log.lik.vm(par = c(.x, results$beta.1[1], results$kappa[1]), 
-                                         x = x, 
-                                         y = y
-  ))) %>% 
-  ggplot() +
-  geom_line(aes(x = beta_0, y = neg_log_lik)) +
-  theme_classic() +
-  labs(
-    x = expression(beta[0]),
-    y = expression(-log * L(beta[0])),
-    title = expression("Profilo di verosimiglianza per " * beta[0])
-  ) 
-
-tibble(
-  beta_1 = seq(from = -15, to = 15, length.out = 1000),
-  neg_log_lik = map_dbl(beta_1, ~ log.lik.vm(par = c(results$beta.0[1], .x, results$kappa[1]), 
-                                             x = x, 
-                                             y = y
-  ))) %>% 
-  ggplot() +
-  geom_line(aes(x = beta_1, y = neg_log_lik)) +
-  theme_classic() +
-  labs(
-    x = expression(beta[1]),
-    y = expression(-log * L(beta[1])),
-    title = expression("Profilo di verosimiglianza per " * beta[1])
-  ) 
-
-tibble(
-  kappa = seq(from = -15, to = 35, length.out = 1000),
-  neg_log_lik = map_dbl(kappa, ~ log.lik.vm(par = c(results$beta.0[1], results$beta.1[1], .x), 
-                                             x = x, 
-                                             y = y
-  ))) %>% 
-  ggplot() +
-  geom_line(aes(x = kappa, y = neg_log_lik)) +
-  theme_classic() +
-  labs(
-    x = expression(kappa),
-    y = expression(-log * L(kappa)),
-    title = expression("Profilo di verosimiglianza per " * kappa)
+summary_df %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  kable(
+    caption = "Summary statistics across the 1000 simulated replications",
+    align = "lcccc",
+    col.names = c("Parameter", "Mean", "Std. Dev", "2.5%", "97.5%"),
+    format = "markdown"
   )
+
+#' TODO
+#' 
+#' -[] Intervalli di confidenza nominali

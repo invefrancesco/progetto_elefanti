@@ -1,7 +1,7 @@
 MLE Von Mises
 ================
 Francesco Invernizzi
-2025-06-27
+2025-06-30
 
 # Von Mises distribution
 
@@ -168,7 +168,8 @@ Creo due vettori $\mathbf{x}_n$ e $\mathbf{y}_n$ in cui
   con $\beta_0=-1$, $\beta_1 = 3.5$
 
 ``` r
-rndm_x <- rnorm(100)
+rndm_x <- rnorm(1000)
+
 rndm_y <- sapply(rndm_x, function(xi) circular::rvonmises(n = 1, mu = 2*atan(-1 + 3.5 * xi), kappa = 10))
 ```
 
@@ -199,18 +200,8 @@ result <- optim(
   x = rndm_x,
   y = rndm_y, 
   hessian = T)
-```
 
-risultati:
-
-``` r
-result$par
-```
-
-    ##     beta.0     beta.1      kappa 
-    ## -0.8978552  3.2049383  2.3075716
-
-``` r
+# Standard error
 det(result$hessian) != 0 # condizione di invertibilità
 ```
 
@@ -219,16 +210,32 @@ det(result$hessian) != 0 # condizione di invertibilità
 ``` r
 cov.matrix <- solve(result$hessian)
 se <- sqrt(diag(cov.matrix))
+
+# Intervalli di confidenza asintotici (95%)
+result_df <- tibble(
+  parametri = c("beta 0", "beta 1", "kappa"), 
+  estimate = result$par,
+  se = se,
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+)
+
+# Tabella 
+
+result_df %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  kable(
+    col.names = c("Parameter", "Estimate", "Std. Error", "95% CI Lower", "95% CI Upper"),
+    align = "lcccc",
+    format = "markdown"
+  )
 ```
 
-standard error:
-
-``` r
-se
-```
-
-    ##     beta.0     beta.1      kappa 
-    ## 0.05140479 0.14656494 0.13740440
+| Parameter | Estimate | Std. Error | 95% CI Lower | 95% CI Upper |
+|:----------|:--------:|:----------:|:------------:|:------------:|
+| beta 0    | -0.9915  |   0.0199   |   -1.0305    |   -0.9525    |
+| beta 1    |  3.4308  |   0.0548   |    3.3234    |    3.5382    |
+| kappa     |  2.2355  |   0.0433   |    2.1506    |    2.3205    |
 
 Nota esplicativa:
 
@@ -247,7 +254,7 @@ Nota esplicativa:
   corrispondono agli **errori standard asintotici** delle stime dei
   parametri.
 
-### Simulazione di $K$ repliche per lo stesso set di parametri veri
+## Simulazione di $K$ repliche per lo stesso set di parametri veri
 
 Genero $K$ set di dati random e stimo i parametri che massimizzano la
 verosimiglianza per ogni set di dati
@@ -257,25 +264,21 @@ verosimiglianza per ogni set di dati
 ``` r
 gen.data <- function(n, beta.0, beta.1, kappa){
   x <- rnorm(n)
-  y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu=(beta.0 + beta.1 * xi), kappa = kappa))
+  y <- sapply(x, function(xi) circular::rvonmises(n= 1, mu= 2*atan(beta.0 + beta.1 * xi), kappa = kappa))
   data <- tibble(x=x, y=y)
 }
 ```
 
-- Per riproducibilità genero una sola volta la lista di df e la salvo in
-  un file locale. Il codice per generare la funzione non è incluso nel
-  file per poterlo compilare facilmente.
-
-- Inserisco come parametri `n = 1000`, `beta.0 = -1`, `beta.1 = 3.5`,
-  `kappa = 10`
-
-- Creo una lista di 100 dataset
+- Per riproducibilità genero una sola volta una lista di $K = 1000$
+  `tibble` inserendo come come parametri `n = 1000`, `beta.0 = -1`,
+  `beta.1 = 3.5`, `kappa = 10` e la salvo in un file chiamato
+  `sim_1.RData`
 
 ``` r
-load(paste0(dir_data, "/simulazioni.RData"))
+load(paste0(dir_data, "/sim_1.RData"))
 
 results <- map_dfr(
-    .x = datasets,
+    .x = sim_1,
     .f = ~ {
       mle <- optim(
         par = c(beta.0 = 0, beta.1 = 0, kappa = log(2)),
@@ -293,113 +296,50 @@ results <- map_dfr(
     }
   )
 
-results
+summary(results)
 ```
 
-    ## # A tibble: 100 × 4
-    ##    beta.0 beta.1    kappa convergence
-    ##     <dbl>  <dbl>    <dbl>       <int>
-    ##  1  5.55    3.73 3.91e- 1           0
-    ##  2  5.50    3.68 3.36e- 1           0
-    ##  3 13.3    46.0  1.99e-36           0
-    ##  4 13.3    46.0  1.99e-36           0
-    ##  5  7.03   19.2  2.14e-25           0
-    ##  6 -0.907   3.21 1.18e+ 0           0
-    ##  7 29.5     8.57 7.96e-24           0
-    ##  8  5.50    3.65 3.17e- 1           0
-    ##  9 13.3    46.0  1.99e-36           0
-    ## 10 11.9    48.9  4.03e-40           0
-    ## # ℹ 90 more rows
+    ##      beta.0            beta.1          kappa         convergence
+    ##  Min.   :-1.0647   Min.   :3.336   Min.   : 8.877   Min.   :0   
+    ##  1st Qu.:-1.0135   1st Qu.:3.462   1st Qu.: 9.724   1st Qu.:0   
+    ##  Median :-1.0002   Median :3.502   Median :10.014   Median :0   
+    ##  Mean   :-1.0001   Mean   :3.501   Mean   :10.030   Mean   :0   
+    ##  3rd Qu.:-0.9861   3rd Qu.:3.537   3rd Qu.:10.334   3rd Qu.:0   
+    ##  Max.   :-0.9420   Max.   :3.692   Max.   :11.596   Max.   :0
 
-I risultati della simulazione sono decisamente diversi da quelli che ci
-si potrebbe aspettare.
-
-- Provo a visualizzare il primo campione
+Visualizzo i risultati
 
 ``` r
-ggplot(data = datasets[[1]]) + 
-  geom_histogram(aes(x)) +
-  theme_classic()
-```
+summary_df <- tibble(
+  Parameter = c("beta[0]", "beta[1]", "kappa"),
+  Mean      = c(mean(results$beta.0), mean(results$beta.1), mean(results$kappa)),
+  `Std. Dev` = c(sd(results$beta.0), sd(results$beta.1), sd(results$kappa)),
+  `2.5%`    = c(quantile(results$beta.0, 0.025),
+                quantile(results$beta.1, 0.025),
+                quantile(results$kappa, 0.025)),
+  `97.5%`   = c(quantile(results$beta.0, 0.975),
+                quantile(results$beta.1, 0.975),
+                quantile(results$kappa, 0.975))
+)
 
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
-
-``` r
-circular::plot.circular(datasets[[1]]$y)
-```
-
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-2.png)<!-- -->
-
-``` r
-ggplot(data = datasets[[1]]) +
-  geom_point(aes(x, y)) + 
-  theme_classic()
-```
-
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-8-3.png)<!-- -->
-
-- Profile likelihood dei parametri
-  - Faccio il grafico della - log-liklihood per ognuno dei parametri,
-    fissati gli altri due nei punti stimati da `optim`
-
-``` r
-x <- datasets[[1]]$x
-y <- datasets[[1]]$y
-
-tibble(
-  beta_0 = seq(from = -15, to = 15, length.out = 1000),
-  neg_log_lik = map_dbl(beta_0, ~ log.lik.vm(par = c(.x, results$beta.1[1], results$kappa[1]), 
-                                         x = x, 
-                                         y = y
-  ))) %>% 
-  ggplot() +
-  geom_line(aes(x = beta_0, y = neg_log_lik)) +
-  theme_classic() +
-  labs(
-    x = expression(beta[0]),
-    y = expression(-log * L(beta[0])),
-    title = expression("Profilo di verosimiglianza per " * beta[0])
-  ) 
-```
-
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
-
-``` r
-tibble(
-  beta_1 = seq(from = -15, to = 15, length.out = 1000),
-  neg_log_lik = map_dbl(beta_1, ~ log.lik.vm(par = c(results$beta.0[1], .x, results$kappa[1]), 
-                                             x = x, 
-                                             y = y
-  ))) %>% 
-  ggplot() +
-  geom_line(aes(x = beta_1, y = neg_log_lik)) +
-  theme_classic() +
-  labs(
-    x = expression(beta[1]),
-    y = expression(-log * L(beta[1])),
-    title = expression("Profilo di verosimiglianza per " * beta[1])
-  ) 
-```
-
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->
-
-``` r
-tibble(
-  kappa = seq(from = -15, to = 35, length.out = 1000),
-  neg_log_lik = map_dbl(kappa, ~ log.lik.vm(par = c(results$beta.0[1], results$beta.1[1], .x), 
-                                             x = x, 
-                                             y = y
-  ))) %>% 
-  ggplot() +
-  geom_line(aes(x = kappa, y = neg_log_lik)) +
-  theme_classic() +
-  labs(
-    x = expression(kappa),
-    y = expression(-log * L(kappa)),
-    title = expression("Profilo di verosimiglianza per " * kappa)
+summary_df %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  kable(
+    caption = "Summary statistics across the 1000 simulated replications",
+    align = "lcccc",
+    col.names = c("Parameter", "Mean", "Std. Dev", "2.5%", "97.5%"),
+    format = "markdown"
   )
 ```
 
-![](vonmises_distribution_files/figure-gfm/unnamed-chunk-9-3.png)<!-- -->
+| Parameter |  Mean   | Std. Dev |  2.5%   |  97.5%  |
+|:----------|:-------:|:--------:|:-------:|:-------:|
+| beta\[0\] | -1.0001 |  0.0198  | -1.0386 | -0.9616 |
+| beta\[1\] | 3.5010  |  0.0558  | 3.3933  | 3.6093  |
+| kappa     | 10.0305 |  0.4347  | 9.2221  | 10.9423 |
+
+Summary statistics across the 1000 simulated replications
+
+TODO
+
+-\[\] Intervalli di confidenza nominali
