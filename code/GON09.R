@@ -3,8 +3,7 @@
 #' author: "Francesco Invernizzi"
 #' date: "`r format(Sys.Date())`"
 #' output:
-#'  html_document:
-#'    code_folding: hide
+#'  github_document
 #' ---
 #+ include = F
 setwd(dirname(dirname(rstudioapi::getSourceEditorContext()$path)))
