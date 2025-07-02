@@ -211,7 +211,6 @@ summary_df <- tibble(
 summary_df %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   kable(
-    caption = "Summary statistics across the 1000 simulated replications",
     align = "lcccc",
     col.names = c("Parameter", "Mean", "Std. Dev", "2.5%", "97.5%"),
     format = "markdown"

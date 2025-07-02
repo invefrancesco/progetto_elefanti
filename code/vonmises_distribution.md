@@ -1,7 +1,7 @@
 MLE Von Mises
 ================
 Francesco Invernizzi
-2025-06-30
+2025-07-01
 
 # Von Mises distribution
 
@@ -233,9 +233,9 @@ result_df %>%
 
 | Parameter | Estimate | Std. Error | 95% CI Lower | 95% CI Upper |
 |:----------|:--------:|:----------:|:------------:|:------------:|
-| beta 0    | -1.0087  |   0.0185   |   -1.0450    |   -0.9724    |
-| beta 1    |  3.5328  |   0.0509   |    3.4330    |    3.6327    |
-| kappa     |  2.3701  |   0.0435   |    2.2847    |    2.4554    |
+| beta 0    | -1.0285  |   0.0190   |   -1.0658    |   -0.9913    |
+| beta 1    |  3.5658  |   0.0525   |    3.4630    |    3.6687    |
+| kappa     |  2.3556  |   0.0435   |    2.2703    |    2.4409    |
 
 Nota esplicativa:
 
@@ -325,7 +325,6 @@ summary_df <- tibble(
 summary_df %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   kable(
-    caption = "Summary statistics across the 1000 simulated replications",
     align = "lcccc",
     col.names = c("Parameter", "Mean", "Std. Dev", "2.5%", "97.5%"),
     format = "markdown"
@@ -337,5 +336,3 @@ summary_df %>%
 | beta 0    | -1.0001 |  0.0198  | -1.0386 | -0.9616 |
 | beta 1    | 3.5010  |  0.0558  | 3.3933  | 3.6093  |
 | kappa     | 10.0305 |  0.4347  | 9.2221  | 10.9423 |
-
-Summary statistics across the 1000 simulated replications
