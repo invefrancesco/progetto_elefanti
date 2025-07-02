@@ -99,6 +99,15 @@ ggplot(data = GON09_fnl, aes(x = direction_p, y = ..density..)) +
 #'  * $\mathbf{x}_i = (1, \text{distriv}_i, \text{elev}_i, \text{ndvi}_i, \text{seas}_i)$
 #'  * $\boldsymbol{\beta} = (\beta_0, \beta_1, \dots, \beta_k)$
 #'  * $\kappa = \exp(\theta)$, per garantire $\kappa > 0$
+#' 
+#' Assumiamo per il turn angle (`ta`) il seguente modello: 
+#' 
+#' $$
+#' y_i \propto \beta_0 + \beta_1 \cdot \text{distriv}_i + \beta_2 \cdot \text{elev}_i + 
+#' \beta_3 \cdot \text{ndvi}_i + \beta_4 \cdot \text{seasCD}_i + \beta_5 \cdot \text{seasHD}_i
+#' $$
+#' 
+#' dove la variabile `seas` è trattata come fattore con base la stagione "HW"
 
 log.lik.VM <- function(par, data, formula, response){
   # Dati
