@@ -1,7 +1,7 @@
 Analisi del primo elefante (id: GON09)
 ================
 Francesco Invernizzi
-2025-07-02
+2025-07-03
 
 Usando il pacchetto `amt` e seguendo i passaggi svolti nel [paper di
 riferimento del pacchetto](https://doi.org/10.1002/ece3.4823) svolgo le
@@ -267,15 +267,16 @@ fit <- optim(
 )
 
 # Risultati
-result <- tibble(
-  parametri = c("beta 0", "beta 1", "beta 2", "beta 3", "beta 4", "beta 5", "kappa"),
+tibble(
+  parametri = factor(c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                       "Seas = CD", "Seas = HD", "Kappa"),
+                     levels = c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                                "Seas = CD", "Seas = HD", "Kappa")),
   estimate = c(fit$par[1:6], exp(fit$par[7])), 
   se = sqrt(diag(solve(fit$hessian))),
   lower = estimate - qnorm(0.975) * se,
   upper = estimate + qnorm(0.975) * se
-) 
-
-result %>%
+) %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   kable(
     col.names = c("Parameter", "Estimate", "Std. Error", "95% CI Lower", "95% CI Upper"),
@@ -284,12 +285,172 @@ result %>%
   )
 ```
 
-| Parameter | Estimate | Std. Error | 95% CI Lower | 95% CI Upper |
-|:----------|:--------:|:----------:|:------------:|:------------:|
-| beta 0    |  0.2603  |   0.0610   |    0.1407    |    0.3799    |
-| beta 1    |  0.1035  |   0.0153   |    0.0736    |    0.1335    |
-| beta 2    | -0.0008  |   0.0002   |   -0.0012    |   -0.0005    |
-| beta 3    | -0.0001  |   0.0000   |   -0.0001    |    0.0000    |
-| beta 4    |  0.1984  |   0.0375   |    0.1250    |    0.2719    |
-| beta 5    |  0.2860  |   0.0397   |    0.2082    |    0.3637    |
-| kappa     |  0.8564  |   0.0275   |    0.8026    |    0.9102    |
+| Parameter           | Estimate | Std. Error | 95% CI Lower | 95% CI Upper |
+|:--------------------|:--------:|:----------:|:------------:|:------------:|
+| Intercept           |  0.2603  |   0.0610   |    0.1407    |    0.3799    |
+| Distance from water |  0.1035  |   0.0153   |    0.0736    |    0.1335    |
+| Elevation           | -0.0008  |   0.0002   |   -0.0012    |   -0.0005    |
+| NDVI Index          | -0.0001  |   0.0000   |   -0.0001    |    0.0000    |
+| Seas = CD           |  0.1984  |   0.0375   |    0.1250    |    0.2719    |
+| Seas = HD           |  0.2860  |   0.0397   |    0.2082    |    0.3637    |
+| Kappa               |  0.8564  |   0.0275   |    0.8026    |    0.9102    |
+
+``` r
+tibble(
+  parameter = factor(c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                       "Seas = CD", "Seas = HD", "Kappa"),
+                     levels = c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                                "Seas = CD", "Seas = HD", "Kappa")),
+  estimate = c(fit$par[1:6], exp(fit$par[7])), 
+  se = sqrt(diag(solve(fit$hessian))),
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+) %>%
+  ggplot(aes(estimate, parameter)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = lower, xmax = upper)) +
+  geom_vline(xintercept = 0, lty = 2, color = "red") +
+  labs(
+    x = "Estimate with conf. intervals"
+  ) +
+  theme_classic()
+```
+
+<img src="GON09_files/figure-gfm/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+
+### Regressione con variabili standardizzate
+
+[Link](https://www.statlect.com/fundamentals-of-statistics/linear-regression-with-standardized-variables)
+su cui ho approfondito
+
+- Standardizziamo le covariate prima di includerle nella regressione
+- Ci aspetteremmo un coefficiente pari a 0 per l’intercetta: si potrebbe
+  anche escludere dalla regressione, ma per uniformità del codice lo
+  includo.
+- I coefficienti standardizzati sono di più facile interpretazione e
+  possono essere confrontati tra di loro
+  - In una regressione standardizzata un incremento unitario corrisponde
+    ad uno scostamento di una deviazione standard dalla media
+  - In questo caso l’interpretazione non dovrebbe essere così lineare
+    perché i coefficienti passano attraverso la funzione link
+
+``` r
+GON09_fnl <- GON09_fnl %>% 
+  mutate("distriv_std" = scale(GON09_fnl$distriv)[,1],
+         "elev_std" = scale(GON09_fnl$elev)[,1],
+         "ndvi_std" = scale(GON09_fnl$ndvi)[,1])
+
+fit_std <- optim(
+  par = c(rep(0,6), log(2)),
+  fn = log.lik.VM, 
+  data = GON09_fnl, 
+  formula = ~ distriv_std + elev_std + ndvi_std + seas, 
+  response = "ta_",
+  hessian = T
+)
+
+tibble(
+  parametri = c("Intercept", "Distance from water", "Elevation", "NDVI Index", "Seas = CD", "Seas = HD", "Kappa"),
+  estimate = c(fit_std$par[1:6], exp(fit_std$par[7])), 
+  se = sqrt(diag(solve(fit_std$hessian))),
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+) %>% 
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  kable(
+    col.names = c("Parameter", "Estimate", "Std. Error", "95% CI Lower", "95% CI Upper"),
+    align = "lcccc",
+    format = "markdown"
+  )
+```
+
+| Parameter           | Estimate | Std. Error | 95% CI Lower | 95% CI Upper |
+|:--------------------|:--------:|:----------:|:------------:|:------------:|
+| Intercept           | -0.1286  |   0.0258   |   -0.1791    |   -0.0781    |
+| Distance from water |  0.0763  |   0.0154   |    0.0462    |    0.1065    |
+| Elevation           |  0.0324  |   0.0152   |    0.0027    |    0.0621    |
+| NDVI Index          |  0.0562  |   0.0160   |    0.0248    |    0.0876    |
+| Seas = CD           |  0.1068  |   0.0350   |    0.0382    |    0.1754    |
+| Seas = HD           |  0.1084  |   0.0373   |    0.0352    |    0.1816    |
+| Kappa               |  0.8160  |   0.0294   |    0.7584    |    0.8736    |
+
+``` r
+tibble(
+  parameter = factor(c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                       "Seas = CD", "Seas = HD", "Kappa"),
+                     levels = c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                                "Seas = CD", "Seas = HD", "Kappa")),
+  estimate = c(fit_std$par[1:6], exp(fit_std$par[7])), 
+  se = sqrt(diag(solve(fit_std$hessian))),
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+) %>%
+  ggplot(aes(estimate, parameter)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = lower, xmax = upper)) +
+  geom_vline(xintercept = 0, lty = 2, color = "red") +
+  labs(
+    x = "Estimate with conf. intervals"
+  ) +
+  theme_test()
+```
+
+<img src="GON09_files/figure-gfm/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
+
+``` r
+expand_grid(
+    distriv_seq = seq(
+      from = min(GON09_fnl$distriv_std, na.rm = T),
+      to = max(GON09_fnl$distriv_std, na.rm = T),
+      length.out = 100
+    ),
+    seas = c("HW", "CD", "HD")) %>% 
+  mutate(
+    seasCD = as.numeric(seas == "CD"),
+    seasHD = as.numeric(seas == "HD"),
+    mu = 2 * atan(fit_std$par[1] + distriv_seq * fit_std$par[2] + seasCD * fit_std$par[5] + seasHD * fit_std$par[6])
+  ) %>% 
+  ggplot(aes(x = distriv_seq, y = mu, color = seas)) +
+  geom_line() +
+  labs(
+    x = "Distance from water",
+    y = "Turn angle"
+  ) + 
+  theme_test()
+```
+
+<img src="GON09_files/figure-gfm/unnamed-chunk-8-2.png" style="display: block; margin: auto;" />
+
+### Distribuzione dei residui
+
+I residui sono sempre compresi in $-\pi$ a $+\pi$, cioè circa tra
+$-3.14$ e $+3.14$. \* Se `ta_ > mu`, il residuo è positivo → l’elefante
+ha girato più a destra del previsto \* Se `ta_ < mu`, il residuo è
+negativo → ha girato più a sinistra
+
+``` r
+GON09_fnl %>% 
+  mutate(
+    seasCD = as.numeric(seas == "CD"),
+    seasHD = as.numeric(seas == "HD"),
+    mu = 2 * atan(fit_std$par[1] + 
+                    fit_std$par[2] * GON09_fnl$distriv_std + 
+                    fit_std$par[3] *  GON09_fnl$elev_std+ 
+                    fit_std$par[4] * GON09_fnl$ndvi_std+ 
+                    fit_std$par[5] * seasCD + 
+                    fit_std$par[6] * seasHD)
+  ) %>% 
+  dplyr::select(ta_, mu) %>% 
+  dplyr::filter(is.na(ta_) == F) %>% 
+  mutate(
+    res = (ta_ - mu)
+  ) %>% 
+  ggplot(aes(x = res)) + 
+  geom_histogram(color = "black", fill = NA) +
+  labs(x = "Residui") +
+  theme_test()
+```
+
+<img src="GON09_files/figure-gfm/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
+
+I residui appaiono ben centrati su 0 e distribuiti tra $-\pi$ e $+ \pi$

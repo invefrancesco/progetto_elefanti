@@ -143,18 +143,143 @@ fit <- optim(
 )
 
 # Risultati
-result <- tibble(
-  parametri = c("beta 0", "beta 1", "beta 2", "beta 3", "beta 4", "beta 5", "kappa"),
+tibble(
+  parametri = factor(c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                       "Seas = CD", "Seas = HD", "Kappa"),
+                     levels = c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                                "Seas = CD", "Seas = HD", "Kappa")),
   estimate = c(fit$par[1:6], exp(fit$par[7])), 
   se = sqrt(diag(solve(fit$hessian))),
   lower = estimate - qnorm(0.975) * se,
   upper = estimate + qnorm(0.975) * se
-) 
-
-result %>%
+) %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   kable(
     col.names = c("Parameter", "Estimate", "Std. Error", "95% CI Lower", "95% CI Upper"),
     align = "lcccc",
     format = "markdown"
   )
+
+tibble(
+  parameter = factor(c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                       "Seas = CD", "Seas = HD", "Kappa"),
+                     levels = c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                                "Seas = CD", "Seas = HD", "Kappa")),
+  estimate = c(fit$par[1:6], exp(fit$par[7])), 
+  se = sqrt(diag(solve(fit$hessian))),
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+) %>%
+  ggplot(aes(estimate, parameter)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = lower, xmax = upper)) +
+  geom_vline(xintercept = 0, lty = 2, color = "red") +
+  labs(
+    x = "Estimate with conf. intervals"
+  ) +
+  theme_classic()
+
+#' ### Regressione con variabili standardizzate 
+#' 
+#' [Link](https://www.statlect.com/fundamentals-of-statistics/linear-regression-with-standardized-variables) su cui ho approfondito
+#' 
+#' - Standardizziamo le covariate prima di includerle nella regressione
+#' - Ci aspetteremmo un coefficiente pari a 0 per l'intercetta: si potrebbe anche escludere dalla regressione, ma per uniformità del codice lo includo.
+#' - I coefficienti standardizzati sono di più facile interpretazione e possono essere confrontati tra di loro 
+#'    -   In una regressione standardizzata un incremento unitario corrisponde ad uno scostamento di una deviazione standard dalla media 
+#'    -   In questo caso l'interpretazione non dovrebbe essere così lineare perché i coefficienti passano attraverso la funzione link
+
+GON09_fnl <- GON09_fnl %>% 
+  mutate("distriv_std" = scale(GON09_fnl$distriv)[,1],
+         "elev_std" = scale(GON09_fnl$elev)[,1],
+         "ndvi_std" = scale(GON09_fnl$ndvi)[,1])
+
+fit_std <- optim(
+  par = c(rep(0,6), log(2)),
+  fn = log.lik.VM, 
+  data = GON09_fnl, 
+  formula = ~ distriv_std + elev_std + ndvi_std + seas, 
+  response = "ta_",
+  hessian = T
+)
+
+tibble(
+  parametri = c("Intercept", "Distance from water", "Elevation", "NDVI Index", "Seas = CD", "Seas = HD", "Kappa"),
+  estimate = c(fit_std$par[1:6], exp(fit_std$par[7])), 
+  se = sqrt(diag(solve(fit_std$hessian))),
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+) %>% 
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  kable(
+    col.names = c("Parameter", "Estimate", "Std. Error", "95% CI Lower", "95% CI Upper"),
+    align = "lcccc",
+    format = "markdown"
+  )
+
+tibble(
+  parameter = factor(c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                       "Seas = CD", "Seas = HD", "Kappa"),
+                     levels = c("Intercept", "Distance from water", "Elevation", "NDVI Index",
+                                "Seas = CD", "Seas = HD", "Kappa")),
+  estimate = c(fit_std$par[1:6], exp(fit_std$par[7])), 
+  se = sqrt(diag(solve(fit_std$hessian))),
+  lower = estimate - qnorm(0.975) * se,
+  upper = estimate + qnorm(0.975) * se
+) %>%
+  ggplot(aes(estimate, parameter)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = lower, xmax = upper)) +
+  geom_vline(xintercept = 0, lty = 2, color = "red") +
+  labs(
+    x = "Estimate with conf. intervals"
+  ) +
+  theme_test()
+
+expand_grid(
+    distriv_seq = seq(
+      from = min(GON09_fnl$distriv_std, na.rm = T),
+      to = max(GON09_fnl$distriv_std, na.rm = T),
+      length.out = 100
+    ),
+    seas = c("HW", "CD", "HD")) %>% 
+  mutate(
+    seasCD = as.numeric(seas == "CD"),
+    seasHD = as.numeric(seas == "HD"),
+    mu = 2 * atan(fit_std$par[1] + distriv_seq * fit_std$par[2] + seasCD * fit_std$par[5] + seasHD * fit_std$par[6])
+  ) %>% 
+  ggplot(aes(x = distriv_seq, y = mu, color = seas)) +
+  geom_line() +
+  labs(
+    x = "Distance from water",
+    y = "Turn angle"
+  ) + 
+  theme_test()
+#' ### Distribuzione dei residui 
+#' 
+#' I residui sono sempre compresi in $-\pi$ a $+\pi$, cioè circa tra $-3.14$ e $+3.14$.
+#'  * Se `ta_ > mu`, il residuo è positivo → l'elefante ha girato più a destra del previsto
+#'  * Se `ta_ < mu`, il residuo è negativo → ha girato più a sinistra
+
+GON09_fnl %>% 
+  mutate(
+    seasCD = as.numeric(seas == "CD"),
+    seasHD = as.numeric(seas == "HD"),
+    mu = 2 * atan(fit_std$par[1] + 
+                    fit_std$par[2] * GON09_fnl$distriv_std + 
+                    fit_std$par[3] *  GON09_fnl$elev_std+ 
+                    fit_std$par[4] * GON09_fnl$ndvi_std+ 
+                    fit_std$par[5] * seasCD + 
+                    fit_std$par[6] * seasHD)
+  ) %>% 
+  dplyr::select(ta_, mu) %>% 
+  dplyr::filter(is.na(ta_) == F) %>% 
+  mutate(
+    res = (ta_ - mu)
+  ) %>% 
+  ggplot(aes(x = res)) + 
+  geom_histogram(color = "black", fill = NA) +
+  labs(x = "Residui") +
+  theme_test()
+
+#' I residui appaiono ben centrati su 0 e distribuiti tra $-\pi$ e $+ \pi$
