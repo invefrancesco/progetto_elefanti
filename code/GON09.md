@@ -424,9 +424,11 @@ expand_grid(
 ### Distribuzione dei residui
 
 I residui sono sempre compresi in $-\pi$ a $+\pi$, cioè circa tra
-$-3.14$ e $+3.14$. \* Se `ta_ > mu`, il residuo è positivo → l’elefante
-ha girato più a destra del previsto \* Se `ta_ < mu`, il residuo è
-negativo → ha girato più a sinistra
+$-3.14$ e $+3.14$.
+
+- Se `ta_ > mu`, il residuo è positivo → l’elefante ha girato più a
+  destra del previsto
+- Se `ta_ < mu`, il residuo è negativo → ha girato più a sinistra
 
 ``` r
 GON09_fnl %>% 
